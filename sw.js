@@ -2,11 +2,11 @@
    Estrategia: si hay internet, siempre trae la versión más nueva (y la guarda en caché
    de paso); si no hay internet, sirve la última copia guardada. El catálogo en sí vive
    en IndexedDB (js/db.js), no aquí — este cache solo cubre el código de la app. */
-const CACHE_NAME = 'tsi-catalogo-v1';
+const CACHE_NAME = 'tsi-catalogo-v2';
 const ASSETS = [
   './', './index.html', './manifest.json', './icon-192.png', './icon-512.png',
-  './vendor/xlsx.full.min.js',
-  './js/db.js', './js/parser-gvs.js', './js/parser-generic.js',
+  './vendor/xlsx.full.min.js', './vendor/jszip.min.js',
+  './js/db.js', './js/xlsx-images.js', './js/parser-gvs.js', './js/parser-generic.js',
   './js/search.js', './js/ui.js', './js/import-wizard.js', './js/app.js'
 ];
 

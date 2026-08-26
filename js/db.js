@@ -5,7 +5,7 @@ var TC = window.TC || (window.TC = {});
 
 TC.db = (function () {
   const DB_NAME = 'tsiCatalogoDB';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   let dbPromise = null;
 
   function open() {
@@ -28,6 +28,10 @@ TC.db = (function () {
         }
         if (!db.objectStoreNames.contains('perfilesImportacion')) {
           db.createObjectStore('perfilesImportacion', { keyPath: 'proveedor' });
+        }
+        if (!db.objectStoreNames.contains('imagenes')) {
+          const store = db.createObjectStore('imagenes', { keyPath: 'id' });
+          store.createIndex('proveedor', 'proveedor', { unique: false });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -55,12 +59,9 @@ TC.db = (function () {
     });
   }
 
-  async function replaceProductos(proveedor, productos) {
-    const t = await tx('productos', 'readwrite');
-    const store = t.objectStore('productos');
-    const idx = store.index('proveedor');
-    await new Promise((resolve, reject) => {
-      const cursorReq = idx.openCursor(IDBKeyRange.only(proveedor));
+  function borrarPorProveedor(store, proveedor) {
+    return new Promise((resolve, reject) => {
+      const cursorReq = store.index('proveedor').openCursor(IDBKeyRange.only(proveedor));
       cursorReq.onsuccess = () => {
         const cursor = cursorReq.result;
         if (cursor) { cursor.delete(); cursor.continue(); }
@@ -68,8 +69,27 @@ TC.db = (function () {
       };
       cursorReq.onerror = () => reject(cursorReq.error);
     });
+  }
+
+  async function replaceProductos(proveedor, productos) {
+    const t = await tx('productos', 'readwrite');
+    const store = t.objectStore('productos');
+    await borrarPorProveedor(store, proveedor);
     for (const p of productos) store.put(p);
     return txDone(t);
+  }
+
+  async function replaceImagenes(proveedor, imagenes) {
+    const t = await tx('imagenes', 'readwrite');
+    const store = t.objectStore('imagenes');
+    await borrarPorProveedor(store, proveedor);
+    for (const img of imagenes) store.put(img);
+    return txDone(t);
+  }
+
+  async function getAllImagenes() {
+    const t = await tx('imagenes', 'readonly');
+    return reqToPromise(t.objectStore('imagenes').getAll());
   }
 
   async function getAllProductos() {
@@ -122,6 +142,6 @@ TC.db = (function () {
   return {
     open, replaceProductos, getAllProductos, getAllOverrides,
     putOverride, deleteOverride, putImportacion, getImportaciones,
-    getPerfil, putPerfil
+    getPerfil, putPerfil, replaceImagenes, getAllImagenes
   };
 })();

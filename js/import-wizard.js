@@ -59,6 +59,7 @@ TC.importWizard = (function () {
   }
 
   function abrir() {
+    limpiarUrlsPreview();
     state = {};
     els.inputArchivoGVS.value = '';
     els.inputArchivoGenerico.value = '';
@@ -68,6 +69,7 @@ TC.importWizard = (function () {
   }
 
   function cerrar() {
+    limpiarUrlsPreview();
     els.modal.classList.add('hidden');
   }
 
@@ -100,7 +102,7 @@ TC.importWizard = (function () {
       hojasProcesadas: resultado.hojasProcesadas,
       hojasIgnoradas: resultado.hojasIgnoradas
     };
-    mostrarConfirmacion();
+    await procesarImagenesYConfirmar(buf, false);
   }
 
   async function onArchivoGenerico(e) {
@@ -109,7 +111,7 @@ TC.importWizard = (function () {
     const proveedor = (els.inputProveedorGenerico.value || 'PROVEEDOR').trim().toUpperCase();
     const buf = await leerArchivo(file);
     const workbook = XLSX.read(buf, { type: 'array' });
-    state = { proveedor, archivoNombre: file.name, workbook };
+    state = { proveedor, archivoNombre: file.name, workbook, arrayBuffer: buf };
 
     const perfil = await TC.db.getPerfil(proveedor);
     if (perfil) {
@@ -118,7 +120,7 @@ TC.importWizard = (function () {
       state.productos = resultado.productos;
       state.hojasProcesadas = resultado.hojasProcesadas;
       state.fechaProveedor = null;
-      mostrarConfirmacion(true);
+      await procesarImagenesYConfirmar(buf, true);
     } else {
       renderListaHojas(workbook.SheetNames);
       mostrarPaso('hojas');
@@ -166,7 +168,7 @@ TC.importWizard = (function () {
     els.ivaPorcentaje.value = 19;
   }
 
-  function onGuardarMapeo() {
+  async function onGuardarMapeo() {
     const mapeo = {};
     els.mapeoForm.querySelectorAll('select').forEach(sel => {
       const campo = sel.dataset.campo;
@@ -185,17 +187,53 @@ TC.importWizard = (function () {
     const resultado = TC.parserGenerico.parseWorkbook(state.workbook, perfil);
     state.productos = resultado.productos;
     state.hojasProcesadas = resultado.hojasProcesadas;
-    mostrarConfirmacion(true);
+    await procesarImagenesYConfirmar(state.arrayBuffer, true);
   }
 
-  function mostrarConfirmacion(esGenerico) {
+  function limpiarUrlsPreview() {
+    (state.previewUrls || []).forEach(u => URL.revokeObjectURL(u));
+    state.previewUrls = [];
+  }
+
+  async function procesarImagenesYConfirmar(arrayBuffer, esGenerico) {
+    mostrarPaso('confirmar');
+    els.confirmResumen.textContent = 'Procesando catálogo y buscando fotos de producto...';
+    els.confirmMuestra.innerHTML = '';
+    els.btnConfirmarImport.disabled = true;
+
+    const porHoja = await TC.xlsxImagenes.extraer(arrayBuffer, state.hojasProcesadas);
+    const imagenes = [];
+    for (const p of state.productos) {
+      const mapaHoja = porHoja[p._hojaExcel];
+      const blob = mapaHoja && mapaHoja.get(p._filaExcel);
+      if (blob) imagenes.push({ id: p.id, proveedor: state.proveedor, blob });
+      delete p._filaExcel;
+      delete p._hojaExcel;
+    }
+    state.imagenes = imagenes;
+
+    els.btnConfirmarImport.disabled = false;
+    mostrarConfirmacion(esGenerico, imagenes);
+  }
+
+  function mostrarConfirmacion(esGenerico, imagenes) {
     const fechaTxt = state.fechaProveedor ? ` · fecha del proveedor: ${TC.ui.escapeHtml(state.fechaProveedor)}` : '';
+    const fotosTxt = imagenes.length ? ` · ${imagenes.length} con foto` : '';
     els.confirmResumen.innerHTML = `
       <b>${TC.ui.escapeHtml(state.proveedor)}</b> — ${state.productos.length} productos detectados
-      en ${state.hojasProcesadas.length} hoja(s)${fechaTxt}.`;
-    els.confirmMuestra.innerHTML = state.productos.slice(0, 5).map(p => TC.ui.tarjetaProducto(p)).join('');
+      en ${state.hojasProcesadas.length} hoja(s)${fechaTxt}${fotosTxt}.`;
+
+    limpiarUrlsPreview();
+    const imagenPorId = new Map(imagenes.map(img => [img.id, img.blob]));
+    const muestra = state.productos.slice(0, 5).map(p => {
+      const blob = imagenPorId.get(p.id);
+      if (!blob) return p;
+      const url = URL.createObjectURL(blob);
+      state.previewUrls.push(url);
+      return Object.assign({}, p, { _imagenUrl: url });
+    });
+    els.confirmMuestra.innerHTML = muestra.map(p => TC.ui.tarjetaProducto(p)).join('');
     els.btnEditarMapeo.classList.toggle('hidden', !esGenerico);
-    mostrarPaso('confirmar');
   }
 
   async function onConfirmarImport() {
@@ -203,6 +241,7 @@ TC.importWizard = (function () {
     els.btnConfirmarImport.textContent = 'Guardando...';
     try {
       await TC.db.replaceProductos(state.proveedor, state.productos);
+      await TC.db.replaceImagenes(state.proveedor, state.imagenes || []);
       if (state.perfil) await TC.db.putPerfil(state.perfil);
       await TC.db.putImportacion({
         proveedor: state.proveedor,

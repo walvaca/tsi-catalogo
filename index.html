@@ -51,6 +51,11 @@ header h2 span{display:block;font-size:11px;color:var(--muted);font-weight:400}
 .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
 
 .entry{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+.entry-row{display:flex;gap:12px}
+.entry-media{width:64px;height:64px;flex-shrink:0;border-radius:8px;overflow:hidden;background:var(--bg2);display:flex;align-items:center;justify-content:center}
+.entry-media img{width:100%;height:100%;object-fit:cover;display:block}
+.sin-foto{font-size:22px;opacity:.35}
+.entry-main{flex:1;min-width:0}
 .entry-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
 .entry .codigo{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12.5px;color:var(--muted)}
 .badge{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:3px 8px;border-radius:20px}
@@ -69,6 +74,8 @@ header h2 span{display:block;font-size:11px;color:var(--muted);font-weight:400}
 .alt-title{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;font-weight:700}
 .alt-row{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13px;border-top:1px solid var(--border)}
 .alt-row:first-of-type{border-top:none}
+.alt-media{width:28px;height:28px;flex-shrink:0;border-radius:6px;overflow:hidden;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:13px}
+.alt-media img{width:100%;height:100%;object-fit:cover;display:block}
 .alt-row .codigo{flex-shrink:0}
 .alt-desc{flex:1;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .alt-precio{font-weight:600;flex-shrink:0}
@@ -199,7 +206,9 @@ table th{background:var(--card2);position:sticky;top:0}
 </div>
 
 <script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
 <script src="js/db.js"></script>
+<script src="js/xlsx-images.js"></script>
 <script src="js/parser-gvs.js"></script>
 <script src="js/parser-generic.js"></script>
 <script src="js/search.js"></script>

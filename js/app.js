@@ -6,6 +6,7 @@ var TC = window.TC || (window.TC = {});
   let fusionado = [];
   let indice = [];
   let editandoId = null;
+  let imagenUrls = new Map();
 
   const $ = id => document.getElementById(id);
   let els = {};
@@ -15,9 +16,20 @@ var TC = window.TC || (window.TC = {});
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
   }
 
+  async function recargarImagenes() {
+    const imagenes = await TC.db.getAllImagenes();
+    for (const url of imagenUrls.values()) URL.revokeObjectURL(url);
+    imagenUrls = new Map(imagenes.map(img => [img.id, URL.createObjectURL(img.blob)]));
+  }
+
   async function recargarDatos() {
     [productos, overridesMap] = await Promise.all([TC.db.getAllProductos(), TC.db.getAllOverrides()]);
+    await recargarImagenes();
     fusionado = TC.search.fusionar(productos, overridesMap);
+    for (const p of fusionado) {
+      const url = imagenUrls.get(p.id);
+      if (url) p._imagenUrl = url;
+    }
     indice = TC.search.construirIndice(fusionado);
     actualizarFiltroProveedor();
     actualizarFiltroCategoria();

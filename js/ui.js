@@ -17,6 +17,12 @@ TC.ui = (function () {
     return `<span class="badge ${cls}">${escapeHtml(p.proveedor)}</span>`;
   }
 
+  function fotoHtml(p, claseTam) {
+    return p._imagenUrl
+      ? `<img src="${escapeHtml(p._imagenUrl)}" alt="" loading="lazy">`
+      : '<div class="sin-foto">📦</div>';
+  }
+
   function tarjetaProducto(p, opts) {
     opts = opts || {};
     const notaHtml = p.nota ? `<div class="nota">📝 ${escapeHtml(p.nota)}</div>` : '';
@@ -31,18 +37,23 @@ TC.ui = (function () {
 
     return `
     <div class="entry" data-id="${escapeHtml(p.id)}">
-      <div class="entry-top">
-        ${badgeProveedor(p)}
-        ${existenciaHtml}
-        <span class="codigo">${escapeHtml(p.codigo)}</span>
+      <div class="entry-row">
+        <div class="entry-media">${fotoHtml(p)}</div>
+        <div class="entry-main">
+          <div class="entry-top">
+            ${badgeProveedor(p)}
+            ${existenciaHtml}
+            <span class="codigo">${escapeHtml(p.codigo)}</span>
+          </div>
+          <div class="desc">${escapeHtml(p.descripcion || '(sin descripción)')}</div>
+          <div class="meta">${escapeHtml(p.marca || '—')} · ${escapeHtml(p.categoria || '')}${p.subcategoria ? ' · ' + escapeHtml(p.subcategoria) : ''}</div>
+          <div class="precios">
+            <div class="precio-con-iva">${moneda(p.precioConIVA)} ${overrideHtml}</div>
+            <div class="precio-sin-iva">${moneda(p.precioSinIVA)} sin IVA</div>
+          </div>
+          ${notaHtml}
+        </div>
       </div>
-      <div class="desc">${escapeHtml(p.descripcion || '(sin descripción)')}</div>
-      <div class="meta">${escapeHtml(p.marca || '—')} · ${escapeHtml(p.categoria || '')}${p.subcategoria ? ' · ' + escapeHtml(p.subcategoria) : ''}</div>
-      <div class="precios">
-        <div class="precio-con-iva">${moneda(p.precioConIVA)} ${overrideHtml}</div>
-        <div class="precio-sin-iva">${moneda(p.precioSinIVA)} sin IVA</div>
-      </div>
-      ${notaHtml}
       <div class="entry-actions">
         ${fichaHtml}
         <button class="btn btn-sec btn-sm act-editar">Ajustar precio / nota</button>
@@ -68,6 +79,7 @@ TC.ui = (function () {
     elAlt.innerHTML = '<div class="alt-title">Alternativas</div>' +
       lista.map(p => `
         <div class="alt-row" data-id="${escapeHtml(p.id)}">
+          <div class="alt-media">${fotoHtml(p)}</div>
           <span class="codigo">${escapeHtml(p.codigo)}</span>
           <span class="alt-desc">${escapeHtml(p.descripcion)}</span>
           <span class="alt-precio">${moneda(p.precioConIVA)}</span>

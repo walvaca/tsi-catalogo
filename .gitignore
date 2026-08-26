@@ -2,3 +2,7 @@
 Thumbs.db
 *.log
 test-data/
+
+# Nunca versionar catálogos reales de proveedores (datos de precios propietarios)
+/*.xlsx
+/*.xls

@@ -71,6 +71,8 @@ TC.parserGVS = (function () {
       productos.push({
         id: `GVS::${cCodigo}`,
         proveedor: 'GVS',
+        _filaExcel: r,
+        _hojaExcel: nombreHoja,
         categoria: nombreHoja,
         marca: marcaActual,
         subcategoria: subcategoriaActual,

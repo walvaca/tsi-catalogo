@@ -63,6 +63,26 @@ con una sola entrada por código (la última procesada). Esto es intencional: ev
 tarjetas duplicadas idénticas en el buscador. El total real guardado en IndexedDB para
 GVS es ~1948, no 2049 — no es un bug si un reimporte muestra ese número.
 
+## Fotos de producto (`js/xlsx-images.js`)
+Las fotos NO se piden aparte: el propio .xlsx de GVS trae una imagen embebida por
+producto. Un .xlsx es un ZIP por dentro (`vendor/jszip.min.js` lo abre); cada hoja
+puede tener un "drawing" que ancla imágenes a filas concretas. Verificado contra el
+archivo real: las fotos de producto están **siempre ancladas en la columna A**
+(columnas más a la derecha traen logos/adornos repetidos que se descartan a
+propósito) — con ese filtro, la hoja CCTV da 443 imágenes para 443 productos, 1:1.
+En la importación real completa, ~1898 de 2049 filas trajeron foto.
+
+El parser (`parser-gvs.js`/`parser-generic.js`) marca cada producto con
+`_filaExcel`/`_hojaExcel` (transitorios, nunca se guardan) para poder cruzarlo con el
+mapa fila→imagen que arma `xlsxImagenes.extraer()`. Las imágenes se guardan como
+`Blob` en el store `imagenes` de IndexedDB (mismo patrón de reemplazo por proveedor
+que `productos`), y la UI las muestra vía `URL.createObjectURL` (revocado y
+reconstruido en cada `recargarDatos()` de `app.js` para no fugar memoria).
+
+Si el .xlsx de un proveedor no tiene "drawings" o su estructura no calza con lo
+esperado, `extraer()` nunca lanza — esa importación simplemente queda sin fotos
+(los productos muestran un ícono de "sin foto" 📦, no un error).
+
 ## Importador genérico (`js/parser-generic.js` + `js/import-wizard.js`)
 Para cualquier proveedor sin parser dedicado (Tecnomax, o uno futuro): el usuario mapea
 columnas una vez por un asistente (qué columna es código/descripción/precio/etc.), el

@@ -96,6 +96,8 @@ TC.parserGenerico = (function () {
       productos.push({
         id: `${perfil.proveedor}::${codigo}`,
         proveedor: perfil.proveedor,
+        _filaExcel: r,
+        _hojaExcel: nombreHoja,
         categoria: m.categoria != null ? str(val(ws, r, m.categoria)) : nombreHoja,
         marca: m.marca != null ? str(val(ws, r, m.marca)) : '',
         subcategoria: m.subcategoria != null ? str(val(ws, r, m.subcategoria)) : '',
