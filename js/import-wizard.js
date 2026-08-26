@@ -1,0 +1,225 @@
+/* Asistente de importación. Dos caminos:
+   - GVS: formato fijo ya mapeado (parser-gvs.js), solo pide el archivo.
+   - Genérico (Tecnomax u otro): si no hay perfil guardado, pide mapear
+     columnas una vez; luego lo reutiliza en cada reimporte. */
+var TC = window.TC || (window.TC = {});
+
+TC.importWizard = (function () {
+  const CAMPOS_MAPEO = [
+    { key: 'codigo', label: 'Código *' },
+    { key: 'descripcion', label: 'Descripción *' },
+    { key: 'precioSinIVA', label: 'Precio sin IVA' },
+    { key: 'precioConIVA', label: 'Precio con IVA' },
+    { key: 'marca', label: 'Marca' },
+    { key: 'categoria', label: 'Categoría' },
+    { key: 'subcategoria', label: 'Subcategoría' },
+    { key: 'textoStock', label: 'Texto de existencia/stock' },
+    { key: 'urlFicha', label: 'URL ficha técnica' }
+  ];
+
+  let state = {};
+  let onImportado = null;
+  let els = {};
+
+  function $(id) { return document.getElementById(id); }
+
+  function init(callbackImportado) {
+    onImportado = callbackImportado;
+    els = {
+      modal: $('modalImportar'),
+      btnCerrar: $('wizCerrar'),
+      pasoStart: $('wizStart'),
+      pasoHojas: $('wizHojas'),
+      pasoMapeo: $('wizMapeo'),
+      pasoConfirmar: $('wizConfirmar'),
+      inputArchivoGVS: $('wizArchivoGVS'),
+      inputProveedorGenerico: $('wizProveedorGenerico'),
+      inputArchivoGenerico: $('wizArchivoGenerico'),
+      listaHojas: $('wizListaHojas'),
+      btnContinuarHojas: $('wizContinuarHojas'),
+      previewTabla: $('wizPreviewTabla'),
+      mapeoForm: $('wizMapeoForm'),
+      filaInicio: $('wizFilaInicio'),
+      ivaPorcentaje: $('wizIvaPorcentaje'),
+      btnGuardarMapeo: $('wizGuardarMapeo'),
+      confirmResumen: $('wizConfirmResumen'),
+      confirmMuestra: $('wizConfirmMuestra'),
+      btnConfirmarImport: $('wizConfirmarImport'),
+      btnEditarMapeo: $('wizEditarMapeo')
+    };
+
+    els.btnCerrar.addEventListener('click', cerrar);
+    els.modal.addEventListener('click', e => { if (e.target === els.modal) cerrar(); });
+    els.inputArchivoGVS.addEventListener('change', onArchivoGVS);
+    els.inputArchivoGenerico.addEventListener('change', onArchivoGenerico);
+    els.btnContinuarHojas.addEventListener('click', onContinuarHojas);
+    els.btnGuardarMapeo.addEventListener('click', onGuardarMapeo);
+    els.btnConfirmarImport.addEventListener('click', onConfirmarImport);
+    els.btnEditarMapeo.addEventListener('click', () => mostrarPaso('mapeo'));
+  }
+
+  function abrir() {
+    state = {};
+    els.inputArchivoGVS.value = '';
+    els.inputArchivoGenerico.value = '';
+    els.inputProveedorGenerico.value = 'TECNOMAX';
+    mostrarPaso('start');
+    els.modal.classList.remove('hidden');
+  }
+
+  function cerrar() {
+    els.modal.classList.add('hidden');
+  }
+
+  function mostrarPaso(nombre) {
+    ['start', 'hojas', 'mapeo', 'confirmar'].forEach(p => {
+      els['paso' + p[0].toUpperCase() + p.slice(1)].classList.toggle('hidden', p !== nombre);
+    });
+  }
+
+  function leerArchivo(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async function onArchivoGVS(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const buf = await leerArchivo(file);
+    const workbook = XLSX.read(buf, { type: 'array' });
+    const resultado = TC.parserGVS.parseWorkbook(workbook);
+    state = {
+      proveedor: 'GVS',
+      archivoNombre: file.name,
+      productos: resultado.productos,
+      fechaProveedor: resultado.fechaProveedor,
+      hojasProcesadas: resultado.hojasProcesadas,
+      hojasIgnoradas: resultado.hojasIgnoradas
+    };
+    mostrarConfirmacion();
+  }
+
+  async function onArchivoGenerico(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const proveedor = (els.inputProveedorGenerico.value || 'PROVEEDOR').trim().toUpperCase();
+    const buf = await leerArchivo(file);
+    const workbook = XLSX.read(buf, { type: 'array' });
+    state = { proveedor, archivoNombre: file.name, workbook };
+
+    const perfil = await TC.db.getPerfil(proveedor);
+    if (perfil) {
+      state.perfil = perfil;
+      const resultado = TC.parserGenerico.parseWorkbook(workbook, perfil);
+      state.productos = resultado.productos;
+      state.hojasProcesadas = resultado.hojasProcesadas;
+      state.fechaProveedor = null;
+      mostrarConfirmacion(true);
+    } else {
+      renderListaHojas(workbook.SheetNames);
+      mostrarPaso('hojas');
+    }
+  }
+
+  function renderListaHojas(nombres) {
+    els.listaHojas.innerHTML = nombres.map((n, i) => `
+      <label class="check-row">
+        <input type="checkbox" value="${TC.ui.escapeHtml(n)}" ${i === 0 ? 'checked' : ''}>
+        ${TC.ui.escapeHtml(n)}
+      </label>`).join('');
+  }
+
+  function onContinuarHojas() {
+    const marcados = Array.from(els.listaHojas.querySelectorAll('input:checked')).map(i => i.value);
+    if (marcados.length === 0) { alert('Selecciona al menos una hoja.'); return; }
+    state.hojasSeleccionadas = marcados;
+    renderMapeo(marcados[0]);
+    mostrarPaso('mapeo');
+  }
+
+  function renderMapeo(nombreHoja) {
+    const ws = state.workbook.Sheets[nombreHoja];
+    const { ancho, filas } = TC.parserGenerico.previewFilas(ws, 10);
+
+    const encabezado = Array.from({ length: ancho }, (_, c) => TC.parserGenerico.colLetter(c));
+    els.previewTabla.innerHTML = '<table><thead><tr>' +
+      encabezado.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' +
+      filas.map(fila => '<tr>' + fila.map(v => `<td>${TC.ui.escapeHtml(v)}</td>`).join('') + '</tr>').join('') +
+      '</tbody></table>';
+
+    const opciones = '<option value="">No aplica</option>' +
+      encabezado.map((h, c) => `<option value="${c}">Columna ${h}</option>`).join('');
+
+    els.mapeoForm.innerHTML = CAMPOS_MAPEO.map(campo => `
+      <div class="mapeo-row">
+        <label>${campo.label}</label>
+        <select data-campo="${campo.key}">${opciones}</select>
+      </div>`).join('');
+
+    const selCodigo = els.mapeoForm.querySelector('[data-campo="codigo"]');
+    selCodigo.selectedIndex = 1;
+    els.filaInicio.value = TC.parserGenerico.sugerirFilaInicio(ws, 0);
+    els.ivaPorcentaje.value = 19;
+  }
+
+  function onGuardarMapeo() {
+    const mapeo = {};
+    els.mapeoForm.querySelectorAll('select').forEach(sel => {
+      const campo = sel.dataset.campo;
+      mapeo[campo] = sel.value === '' ? null : parseInt(sel.value, 10);
+    });
+    if (mapeo.codigo == null) { alert('Debes mapear la columna de Código.'); return; }
+
+    const perfil = {
+      proveedor: state.proveedor,
+      hojas: state.hojasSeleccionadas,
+      filaInicio: parseInt(els.filaInicio.value, 10) || 0,
+      ivaPorcentaje: parseFloat(els.ivaPorcentaje.value) || 19,
+      mapeo
+    };
+    state.perfil = perfil;
+    const resultado = TC.parserGenerico.parseWorkbook(state.workbook, perfil);
+    state.productos = resultado.productos;
+    state.hojasProcesadas = resultado.hojasProcesadas;
+    mostrarConfirmacion(true);
+  }
+
+  function mostrarConfirmacion(esGenerico) {
+    const fechaTxt = state.fechaProveedor ? ` · fecha del proveedor: ${TC.ui.escapeHtml(state.fechaProveedor)}` : '';
+    els.confirmResumen.innerHTML = `
+      <b>${TC.ui.escapeHtml(state.proveedor)}</b> — ${state.productos.length} productos detectados
+      en ${state.hojasProcesadas.length} hoja(s)${fechaTxt}.`;
+    els.confirmMuestra.innerHTML = state.productos.slice(0, 5).map(p => TC.ui.tarjetaProducto(p)).join('');
+    els.btnEditarMapeo.classList.toggle('hidden', !esGenerico);
+    mostrarPaso('confirmar');
+  }
+
+  async function onConfirmarImport() {
+    els.btnConfirmarImport.disabled = true;
+    els.btnConfirmarImport.textContent = 'Guardando...';
+    try {
+      await TC.db.replaceProductos(state.proveedor, state.productos);
+      if (state.perfil) await TC.db.putPerfil(state.perfil);
+      await TC.db.putImportacion({
+        proveedor: state.proveedor,
+        fechaImportacionLocal: new Date().toISOString(),
+        fechaProveedor: state.fechaProveedor,
+        archivoNombre: state.archivoNombre,
+        totalProductos: state.productos.length,
+        hojasProcesadas: state.hojasProcesadas,
+        hojasIgnoradas: state.hojasIgnoradas || []
+      });
+      cerrar();
+      if (onImportado) onImportado();
+    } finally {
+      els.btnConfirmarImport.disabled = false;
+      els.btnConfirmarImport.textContent = 'Confirmar importación';
+    }
+  }
+
+  return { init, abrir };
+})();
