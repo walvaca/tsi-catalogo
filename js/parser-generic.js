@@ -92,6 +92,11 @@ TC.parserGenerico = (function () {
       if (precioSinIVA == null && precioConIVA != null) precioSinIVA = Math.round(precioConIVA / (1 + iva));
 
       const textoStock = m.textoStock != null ? str(val(ws, r, m.textoStock)) : '';
+      // "agotado" (sin unidades) es un estado distinto de "existencia única" (quedan pocas) —
+      // nunca deben verse igual: a un cliente no se le puede decir "hay" cuando no queda nada.
+      const agotado = /agotad/i.test(textoStock);
+      const existenciaUnica = !agotado && /\*\*\s*existencia|\bunica\b|\bunico\b|\búnica\b|\búnico\b/i.test(textoStock);
+      if (agotado) { precioSinIVA = null; precioConIVA = null; }
 
       productos.push({
         id: `${perfil.proveedor}::${codigo}`,
@@ -105,7 +110,8 @@ TC.parserGenerico = (function () {
         descripcion: m.descripcion != null ? str(val(ws, r, m.descripcion)) : '',
         precioSinIVA: precioSinIVA,
         precioConIVA: precioConIVA,
-        existenciaUnica: /\*\*\s*existencia|unica|único|agotado/i.test(textoStock),
+        existenciaUnica: existenciaUnica,
+        agotado: agotado,
         descuento: null,
         precioOfertaConIVA: null,
         vigenciaOferta: null,

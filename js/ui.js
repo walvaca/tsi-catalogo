@@ -29,8 +29,10 @@ TC.ui = (function () {
     const overrideHtml = p._tieneOverride
       ? `<span class="precio-original">${moneda(p._precioConIVAOriginal)}</span>`
       : '';
-    const existenciaHtml = p.existenciaUnica
-      ? '<span class="badge badge-stock">Existencia única</span>' : '';
+    const existenciaHtml = p.agotado
+      ? '<span class="badge badge-agotado">Agotado</span>'
+      : p.existenciaUnica
+        ? '<span class="badge badge-stock">Existencia única</span>' : '';
     const fichaHtml = p.urlFicha
       ? `<a class="btn btn-sec btn-sm" href="${escapeHtml(p.urlFicha)}" target="_blank" rel="noopener">Ver ficha ↗</a>`
       : '';

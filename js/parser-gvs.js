@@ -81,6 +81,7 @@ TC.parserGVS = (function () {
         precioSinIVA: num(val(ws, r, COL.PRECIO)),
         precioConIVA: num(val(ws, r, COL.PRECIO_IVA)),
         existenciaUnica: existenciaUnica,
+        agotado: false,
         descuento: num(val(ws, r, COL.DESCUENTO)),
         precioOfertaConIVA: num(val(ws, r, COL.OFERTA)),
         vigenciaOferta: str(val(ws, r, COL.VIGENCIA)) || null,

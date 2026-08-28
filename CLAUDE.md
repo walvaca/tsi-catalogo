@@ -88,6 +88,50 @@ Para cualquier proveedor sin parser dedicado (Tecnomax, o uno futuro): el usuari
 columnas una vez por un asistente (qué columna es código/descripción/precio/etc.), el
 mapeo se guarda como perfil y se reaplica solo en cada reimportación siguiente.
 
+**Agotado vs. existencia única — no son lo mismo, nunca deben verse igual.**
+`existenciaUnica` (aviso de GVS: "queda poco, corre") y `agotado` (cero unidades) son
+campos separados en el modelo de datos. El importador genérico detecta "agotado" en el
+texto de stock mapeado (`textoStock`) con una regex amplia (`/agotad/i`, a propósito
+tolerante a variantes) y, si lo detecta, **fuerza el precio a `null`** aunque el Excel
+traiga un "$0" literal — mostrar "$0" en vez de "no disponible" le puede hacer decir a
+un vendedor "sí hay" cuando no queda nada. La UI (`ui.js`) pinta un badge rojo sólido
+"Agotado" distinto del badge naranja de "Existencia única".
+
+## Tecnomax manda el catálogo en PDF, no en Excel
+A diferencia de GVS, Tecnomax envía su lista de precios como PDF (`tools/convertir_tecnomax_pdf.py`
+lo documenta a fondo). El PDF sí tiene una tabla real por dentro (celdas con bordes
+detectables), así que se puede extraer con precisión usando `pdfplumber` — pero **eso
+pasa fuera de la app**, como un paso de conversión manual en Python, no dentro del
+navegador:
+
+1. Cuando llegue un PDF nuevo de Tecnomax, correr:
+   `python tools/convertir_tecnomax_pdf.py "ruta/al/nuevo.pdf" "ruta/de/salida.xlsx"`
+   (requiere `pip install pdfplumber openpyxl`). El script clasifica cada fila de forma
+   genérica (no asume columnas fijas, porque el PDF usa layouts distintos por sección:
+   cámaras, accesorios con foto, racks por dimensiones, cables, etc.) y saca un `.xlsx`
+   plano con columnas `Marca | Categoria | Subcategoria | Codigo | Descripcion |
+   PrecioSinIVA | PrecioConIVA | Estado`.
+2. Ese `.xlsx` se importa en la app con el asistente genérico → proveedor `TECNOMAX`.
+   El mapeo de columnas (0=Marca, 1=Categoria, 2=Subcategoria, 3=Codigo, 4=Descripcion,
+   5=PrecioSinIVA, 6=PrecioConIVA, 7=Estado→"Texto de existencia/stock", fila de inicio
+   = 1) ya quedó guardado como perfil reutilizable la primera vez, así que reimportar
+   es casi automático — solo hay que rehacer el paso 1 en Python cada vez.
+
+**Verificado contra el catálogo real de agosto 2026** (63 páginas): 931 productos, de
+los cuales 792 con precio normal, 75 "AGOTADO" y 64 "CONSULTAR ASESOR" (sin precio
+listado, hay que cotizar con el asesor — el importador los deja con precio vacío y sin
+badge especial, a diferencia de "agotado" que si tiene badge). Solo 1 fila de las ~932
+no se pudo clasificar (un renglón sin código, continuación visual de otro ítem). El
+script imprime esas filas problemáticas por consola — conviene revisarlas a mano si
+aparecen más al convertir un PDF futuro, sobre todo si Tecnomax cambia el diseño del
+documento.
+
+**Decisión pendiente con el usuario:** por ahora esta conversión la corre Claude cada
+vez que llega un PDF nuevo (no es 100% autoservicio como GVS). Si se vuelve muy
+frecuente, vale la pena preguntarle a Tecnomax si pueden mandar también en Excel, o
+invertir en un parser de PDF dentro del navegador (más trabajo, con el riesgo de que
+un cambio de formato lo rompa silenciosamente).
+
 ## Seguridad / límites deliberados (no negociable)
 - **Nunca automatizar login ni scraping** de los portales de GVS/Tecnomax con las
   credenciales del usuario. Se verificó que la ficha técnica y disponibilidad en
