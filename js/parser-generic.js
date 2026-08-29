@@ -48,21 +48,46 @@ TC.parserGenerico = (function () {
     return { ancho, alto, filas };
   }
 
-  function sugerirFilaInicio(ws, colCodigo) {
+  function sugerirFilaInicio(ws) {
     const alto = sheetHeight(ws);
     const ancho = sheetWidth(ws);
+    // una fila de encabezado es puro texto; una fila de datos real casi
+    // siempre tiene al menos una celda numérica (precio, cantidad, etc.) en
+    // ALGUNA columna — no hace falta saber todavía cuál es la de código.
     for (let r = 0; r < alto; r++) {
-      const v = val(ws, r, colCodigo);
-      if (v == null || String(v).trim() === '') continue;
-      // una fila de encabezado es puro texto; una fila de datos real casi
-      // siempre tiene al menos una celda numérica (precio, cantidad, etc.)
-      let tieneNumero = false;
       for (let c = 0; c < ancho; c++) {
-        if (typeof val(ws, r, c) === 'number') { tieneNumero = true; break; }
+        if (typeof val(ws, r, c) === 'number') return r;
       }
-      if (tieneNumero) return r;
     }
     return 0;
+  }
+
+  function sugerirColumnaCodigo(ws, filaInicio, ancho) {
+    const alto = sheetHeight(ws);
+    const filasMuestra = Math.min(30, alto - filaInicio);
+    if (filasMuestra <= 0) return 0;
+    let mejorCol = 0, mejorPuntaje = -1;
+    for (let c = 0; c < ancho; c++) {
+      const vistos = new Set();
+      let noVacios = 0, conEspacio = 0;
+      for (let r = filaInicio; r < filaInicio + filasMuestra; r++) {
+        const v = val(ws, r, c);
+        if (v == null || String(v).trim() === '') continue;
+        const s = String(v).trim();
+        noVacios++;
+        if (/\s/.test(s)) conEspacio++;
+        vistos.add(s);
+      }
+      if (noVacios === 0) continue;
+      // un código de producto casi siempre es único por fila y sin espacios —
+      // a diferencia de marca/categoría (se repiten mucho) o descripción (trae espacios)
+      const ratioUnico = vistos.size / noVacios;
+      const ratioSinEspacio = 1 - conEspacio / noVacios;
+      const completitud = noVacios / filasMuestra;
+      const puntaje = ratioUnico * ratioSinEspacio * completitud;
+      if (puntaje > mejorPuntaje) { mejorPuntaje = puntaje; mejorCol = c; }
+    }
+    return mejorCol;
   }
 
   function num(v) {
@@ -132,5 +157,5 @@ TC.parserGenerico = (function () {
     return { productos, hojasProcesadas: perfil.hojas, fechaProveedor: null };
   }
 
-  return { colLetter, sheetWidth, sheetHeight, previewFilas, sugerirFilaInicio, parseWorkbook };
+  return { colLetter, sheetWidth, sheetHeight, previewFilas, sugerirFilaInicio, sugerirColumnaCodigo, parseWorkbook };
 })();

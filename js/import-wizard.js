@@ -169,9 +169,11 @@ TC.importWizard = (function () {
         <select data-campo="${campo.key}">${opciones}</select>
       </div>`).join('');
 
+    const filaInicioSugerida = TC.parserGenerico.sugerirFilaInicio(ws);
+    const colCodigoSugerida = TC.parserGenerico.sugerirColumnaCodigo(ws, filaInicioSugerida, ancho);
     const selCodigo = els.mapeoForm.querySelector('[data-campo="codigo"]');
-    selCodigo.selectedIndex = 1;
-    els.filaInicio.value = TC.parserGenerico.sugerirFilaInicio(ws, 0);
+    selCodigo.value = String(colCodigoSugerida);
+    els.filaInicio.value = filaInicioSugerida;
     els.ivaPorcentaje.value = 19;
   }
 
