@@ -100,37 +100,48 @@ un vendedor "sí hay" cuando no queda nada. La UI (`ui.js`) pinta un badge rojo 
 ## Tecnomax manda el catálogo en PDF, no en Excel
 A diferencia de GVS, Tecnomax envía su lista de precios como PDF (`tools/convertir_tecnomax_pdf.py`
 lo documenta a fondo). El PDF sí tiene una tabla real por dentro (celdas con bordes
-detectables), así que se puede extraer con precisión usando `pdfplumber` — pero **eso
-pasa fuera de la app**, como un paso de conversión manual en Python, no dentro del
-navegador:
+detectables) **y una foto de producto embebida junto a cada fila** — igual de completo
+que el Excel de GVS, solo que en otro contenedor. Todo eso se puede extraer con
+precisión usando **PyMuPDF (fitz)** — pero **eso pasa fuera de la app**, como un paso
+de conversión manual en Python, no dentro del navegador (decisión que tomó el usuario:
+seguir pidiéndole a Claude que convierta cada PDF nuevo, en vez de pedirle Excel a
+Tecnomax o invertir en un parser de PDF dentro del navegador — no volver a plantear
+esa pregunta).
+
+El script usa **una sola librería (PyMuPDF) tanto para el texto de la tabla como para
+las imágenes**, a propósito: así ambas cosas comparten el mismo sistema de
+coordenadas de página, y una fila nunca puede terminar con la foto de otra fila por
+un desajuste entre dos librerías distintas. La foto de cada producto se asigna por
+posición (la imagen embebida cuyo rango vertical mejor se solapa con el de esa fila),
+y se guarda incrustada en la **columna A** del `.xlsx` de salida, en la misma fila que
+su producto — exactamente como hace GVS en su propio Excel — así que el extractor de
+fotos que ya existía en la app (`js/xlsx-images.js`) la reconoce sin tocar código del
+navegador.
 
 1. Cuando llegue un PDF nuevo de Tecnomax, correr:
    `python tools/convertir_tecnomax_pdf.py "ruta/al/nuevo.pdf" "ruta/de/salida.xlsx"`
-   (requiere `pip install pdfplumber openpyxl`). El script clasifica cada fila de forma
+   (requiere `pip install pymupdf openpyxl`). El script clasifica cada fila de forma
    genérica (no asume columnas fijas, porque el PDF usa layouts distintos por sección:
    cámaras, accesorios con foto, racks por dimensiones, cables, etc.) y saca un `.xlsx`
-   plano con columnas `Marca | Categoria | Subcategoria | Codigo | Descripcion |
-   PrecioSinIVA | PrecioConIVA | Estado`.
+   plano con columnas `Foto(vacía, solo la imagen embebida) | Marca | Categoria |
+   Subcategoria | Codigo | Descripcion | PrecioSinIVA | PrecioConIVA | Estado`.
 2. Ese `.xlsx` se importa en la app con el asistente genérico → proveedor `TECNOMAX`.
-   El mapeo de columnas (0=Marca, 1=Categoria, 2=Subcategoria, 3=Codigo, 4=Descripcion,
-   5=PrecioSinIVA, 6=PrecioConIVA, 7=Estado→"Texto de existencia/stock", fila de inicio
-   = 1) ya quedó guardado como perfil reutilizable la primera vez, así que reimportar
-   es casi automático — solo hay que rehacer el paso 1 en Python cada vez.
+   Mapeo de columnas: Marca=1, Categoria=2, Subcategoria=3, Codigo=4, Descripcion=5,
+   PrecioSinIVA=6, PrecioConIVA=7, Estado→"Texto de existencia/stock"=8, fila de
+   inicio=1 (columna 0 no se mapea a nada, es la que trae la foto). Ese mapeo queda
+   guardado como perfil reutilizable la primera vez, así que reimportar es casi
+   automático — solo hay que rehacer el paso 1 en Python cada vez. **Si algún día se
+   cambian las columnas del script, hay que abrir "Editar mapeo" en el asistente y
+   rehacerlo una vez** (el perfil viejo apunta a los índices de columna anteriores).
 
-**Verificado contra el catálogo real de agosto 2026** (63 páginas): 931 productos, de
-los cuales 792 con precio normal, 75 "AGOTADO" y 64 "CONSULTAR ASESOR" (sin precio
-listado, hay que cotizar con el asesor — el importador los deja con precio vacío y sin
-badge especial, a diferencia de "agotado" que si tiene badge). Solo 1 fila de las ~932
-no se pudo clasificar (un renglón sin código, continuación visual de otro ítem). El
-script imprime esas filas problemáticas por consola — conviene revisarlas a mano si
-aparecen más al convertir un PDF futuro, sobre todo si Tecnomax cambia el diseño del
-documento.
-
-**Decisión pendiente con el usuario:** por ahora esta conversión la corre Claude cada
-vez que llega un PDF nuevo (no es 100% autoservicio como GVS). Si se vuelve muy
-frecuente, vale la pena preguntarle a Tecnomax si pueden mandar también en Excel, o
-invertir en un parser de PDF dentro del navegador (más trabajo, con el riesgo de que
-un cambio de formato lo rompa silenciosamente).
+**Verificado contra el catálogo real de agosto 2026** (63 páginas): 932 productos, de
+los cuales el 98% (912) trajo foto, 792 con precio normal, 75 "AGOTADO" y 64
+"CONSULTAR ASESOR" (sin precio listado, hay que cotizar con el asesor — el
+importador los deja con precio vacío y sin badge especial, a diferencia de "agotado"
+que sí tiene badge). Solo 1 fila no se pudo clasificar (un renglón sin código,
+continuación visual de otro ítem). El script imprime esas filas problemáticas por
+consola — conviene revisarlas a mano si aparecen más al convertir un PDF futuro,
+sobre todo si Tecnomax cambia el diseño del documento.
 
 ## Seguridad / límites deliberados (no negociable)
 - **Nunca automatizar login ni scraping** de los portales de GVS/Tecnomax con las
