@@ -3,19 +3,25 @@
 ## Qué es
 Herramienta interna de consulta rápida de precios para vender como distribuidor
 autorizado de tecnología para seguridad electrónica (GVS y Tecnomax como mayoristas).
-Cuando un cliente pregunta por un producto, permite buscarlo al instante y dar precio,
-alternativas y un enlace a la ficha real del proveedor. Es un proyecto hermano de
-`tsi-vault` pero de dominio totalmente distinto (catálogo de productos, no contraseñas)
-— no comparten código.
+Cuando un cliente pregunta por un producto, permite buscarlo al instante, darle precio
+y alternativas, armarle una **cotización con utilidad aplicada** y mandarle un **PDF**
+por WhatsApp. Es un proyecto hermano de `tsi-vault` pero de dominio totalmente distinto
+(catálogo de productos, no contraseñas) — no comparten código. Publicado en
+`https://walvaca.github.io/tsi-catalogo/` (GitHub Pages, repo `walvaca/tsi-catalogo`).
 
 ## Stack técnico
 - Sin framework, sin build step. `index.html` + varios archivos planos en `js/`
   (HTML + CSS + JS vanilla). No hay `package.json` ni `npm install`.
 - `vendor/xlsx.full.min.js` — SheetJS Community Edition (Apache-2.0), vendorizado
   localmente (nunca por CDN) para leer archivos `.xlsx` en el navegador sin conexión.
-- Persistencia: **IndexedDB** (`js/db.js`), no localStorage — se eligió IndexedDB porque
-  cada reimportación mueve miles de filas de golpe y localStorage bloquearía el hilo
-  principal.
+- `vendor/jspdf.umd.min.js` + `vendor/jspdf.plugin.autotable.min.js` (MIT) — generan el
+  PDF de la cotización 100% en el navegador.
+- Persistencia: **IndexedDB** (`js/db.js`) para todo lo estructurado/con blobs
+  (catálogo, imágenes, historial de cotizaciones, config del negocio) — se eligió sobre
+  localStorage porque cada reimportación mueve miles de filas de golpe y localStorage
+  bloquearía el hilo principal. La **cotización en curso** (borrador) es la única
+  excepción: vive en `localStorage` como JSON simple porque son pocos ítems y no
+  necesita transacciones — ver `js/cotizador.js`.
 - `manifest.json` + `sw.js` — PWA instalable/offline, mismo patrón que `tsi-vault/sw.js`.
 
 ## Cómo correrlo / probarlo
@@ -142,6 +148,31 @@ que sí tiene badge). Solo 1 fila no se pudo clasificar (un renglón sin código
 continuación visual de otro ítem). El script imprime esas filas problemáticas por
 consola — conviene revisarlas a mano si aparecen más al convertir un PDF futuro,
 sobre todo si Tecnomax cambia el diseño del documento.
+
+## Cotizador (`js/cotizador.js` + `js/pdf-cotizacion.js`)
+Desde cualquier tarjeta de producto, "+ Cotización" la agrega a un **borrador**
+(`localStorage`, clave `tsiCatalogoCotizacionDraft` — ver arriba por qué no va a
+IndexedDB). "Utilidad" es **markup sobre el costo**: `precioVenta = costo_con_IVA ×
+(1 + %/100)`, no margen sobre el precio de venta — es la forma más común de pensarlo
+("le subo un 20%"). Hay un % global (`aplicarUtilidadATodos`) y cada ítem lo puede
+sobreescribir; si el usuario edita el precio de venta directo en vez del %, el % se
+recalcula al revés solo como referencia (`actualizarItem` en `cotizador.js`).
+
+Al generar el PDF (`TC.pdfCotizacion.generar`, jsPDF + autotable): se arma el objeto
+final con número secuencial (`configuracion.siguienteNumero`, IndexedDB), se guarda
+completo en el store `cotizaciones` **incluyendo el PDF ya generado como `Blob`** (así
+"Reenviar PDF" desde el historial no tiene que rehacer nada), y se vacía el borrador.
+El botón "Compartir por WhatsApp" usa `navigator.share` con el PDF como `File` — solo
+aparece si el navegador lo soporta (`navigator.canShare`); si no, queda "Descargar PDF"
+como respaldo universal (un `<a download>` normal, no una feature del navegador).
+
+Un producto sin precio (agotado/consultar) se puede agregar igual — el ítem arranca con
+`precioVenta: null` y el usuario lo escribe a mano, no hay de dónde calcular un % sin
+costo base.
+
+**Datos del negocio** (nombre, NIT, teléfono, logo) están en el store `configuracion`
+(un solo registro, `id: 'negocio'`) y aparecen en el encabezado del PDF si están
+configurados — si no, el PDF se genera igual, solo sin esa sección.
 
 ## Seguridad / límites deliberados (no negociable)
 - **Nunca automatizar login ni scraping** de los portales de GVS/Tecnomax con las

@@ -5,7 +5,7 @@ var TC = window.TC || (window.TC = {});
 
 TC.db = (function () {
   const DB_NAME = 'tsiCatalogoDB';
-  const DB_VERSION = 2;
+  const DB_VERSION = 3;
   let dbPromise = null;
 
   function open() {
@@ -32,6 +32,12 @@ TC.db = (function () {
         if (!db.objectStoreNames.contains('imagenes')) {
           const store = db.createObjectStore('imagenes', { keyPath: 'id' });
           store.createIndex('proveedor', 'proveedor', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('cotizaciones')) {
+          db.createObjectStore('cotizaciones', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('configuracion')) {
+          db.createObjectStore('configuracion', { keyPath: 'id' });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -139,9 +145,34 @@ TC.db = (function () {
     return txDone(t);
   }
 
+  async function getConfigNegocio() {
+    const t = await tx('configuracion', 'readonly');
+    const cfg = await reqToPromise(t.objectStore('configuracion').get('negocio'));
+    return cfg || { id: 'negocio', nombreNegocio: '', nit: '', telefono: '', logoBlob: null, siguienteNumero: 1 };
+  }
+
+  async function putConfigNegocio(cfg) {
+    const t = await tx('configuracion', 'readwrite');
+    t.objectStore('configuracion').put(Object.assign({ id: 'negocio' }, cfg));
+    return txDone(t);
+  }
+
+  async function putCotizacion(cot) {
+    const t = await tx('cotizaciones', 'readwrite');
+    t.objectStore('cotizaciones').put(cot);
+    return txDone(t);
+  }
+
+  async function getCotizaciones() {
+    const t = await tx('cotizaciones', 'readonly');
+    const rows = await reqToPromise(t.objectStore('cotizaciones').getAll());
+    return rows.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  }
+
   return {
     open, replaceProductos, getAllProductos, getAllOverrides,
     putOverride, deleteOverride, putImportacion, getImportaciones,
-    getPerfil, putPerfil, replaceImagenes, getAllImagenes
+    getPerfil, putPerfil, replaceImagenes, getAllImagenes,
+    getConfigNegocio, putConfigNegocio, putCotizacion, getCotizaciones
   };
 })();

@@ -2,12 +2,14 @@
    Estrategia: si hay internet, siempre trae la versión más nueva (y la guarda en caché
    de paso); si no hay internet, sirve la última copia guardada. El catálogo en sí vive
    en IndexedDB (js/db.js), no aquí — este cache solo cubre el código de la app. */
-const CACHE_NAME = 'tsi-catalogo-v2';
+const CACHE_NAME = 'tsi-catalogo-v3';
 const ASSETS = [
   './', './index.html', './manifest.json', './icon-192.png', './icon-512.png',
   './vendor/xlsx.full.min.js', './vendor/jszip.min.js',
+  './vendor/jspdf.umd.min.js', './vendor/jspdf.plugin.autotable.min.js',
   './js/db.js', './js/xlsx-images.js', './js/parser-gvs.js', './js/parser-generic.js',
-  './js/search.js', './js/ui.js', './js/import-wizard.js', './js/app.js'
+  './js/search.js', './js/ui.js', './js/import-wizard.js',
+  './js/cotizador.js', './js/pdf-cotizacion.js', './js/app.js'
 ];
 
 self.addEventListener('install', e => {

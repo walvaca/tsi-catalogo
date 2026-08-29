@@ -28,8 +28,9 @@ a{color:var(--accent)}
 .btn:disabled{opacity:.5;cursor:default}
 .btn-sec{background:var(--card2);color:var(--text);border:1px solid var(--border)}
 .btn-sm{padding:6px 11px;font-size:12.5px;border-radius:7px}
-.icon-btn{background:transparent;color:var(--muted);padding:8px 10px;border-radius:8px;font-size:18px}
+.icon-btn{background:transparent;color:var(--muted);padding:8px 10px;border-radius:8px;font-size:18px;position:relative}
 .icon-btn:hover{background:var(--card2);color:var(--text)}
+.badge-count{position:absolute;top:2px;right:2px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px}
 
 #app{max-width:900px;margin:0 auto;padding:0 14px 60px}
 header{display:flex;align-items:center;gap:10px;padding:16px 2px 12px;position:sticky;top:0;background:var(--bg);z-index:10}
@@ -101,6 +102,30 @@ table th{background:var(--card2);position:sticky;top:0}
 .mapeo-inline{display:flex;gap:10px}
 .mapeo-inline > div{flex:1}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+
+/* Cotización */
+.cot-links{display:flex;gap:14px;font-size:12.5px;margin:-6px 0 14px}
+.cot-links a{cursor:pointer}
+.cot-utilidad{display:flex;align-items:flex-end;gap:10px;margin-bottom:14px}
+.cot-utilidad > div:first-child{flex:1}
+.cot-item{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--border)}
+.cot-item:first-of-type{border-top:none}
+.cot-item-media{width:44px;height:44px;flex-shrink:0;border-radius:8px;overflow:hidden;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:16px}
+.cot-item-media img{width:100%;height:100%;object-fit:cover}
+.cot-item-main{flex:1;min-width:0}
+.cot-item-main .codigo{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;color:var(--muted)}
+.cot-item-desc{font-size:13px;line-height:1.35;margin:2px 0 6px}
+.cot-item-fields{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.cot-item-fields label{font-size:10.5px;color:var(--muted);display:block;margin-bottom:2px;text-transform:uppercase}
+.cot-item-fields input{width:76px;padding:6px 8px;font-size:13px}
+.cot-item-subtotal{font-weight:700;font-size:14px;margin-left:auto;align-self:center;white-space:nowrap}
+.cot-item-quitar{background:transparent;color:var(--red);border:none;font-size:18px;padding:4px 6px;flex-shrink:0}
+.cot-total{display:flex;justify-content:space-between;align-items:baseline;padding-top:14px;margin-top:6px;border-top:2px solid var(--border);font-size:18px;font-weight:700}
+.cot-total span:first-child{font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase}
+.hist-row{padding:12px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.hist-row:first-of-type{border-top:none}
+.hist-row-info b{display:block;font-size:14px}
+.hist-row-info span{font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -109,6 +134,7 @@ table th{background:var(--card2);position:sticky;top:0}
   <header>
     <div class="logo">🏷️</div>
     <h2>TSI Catálogo<span>Consulta rápida de precios · GVS · Tecnomax</span></h2>
+    <button id="btnCotizacion" class="icon-btn icon-btn-badge" title="Cotización">🧾<span id="badgeCotizacion" class="badge-count hidden">0</span></button>
     <button id="btnImportar" class="icon-btn" title="Importar catálogo">⇪</button>
   </header>
 
@@ -206,8 +232,88 @@ table th{background:var(--card2);position:sticky;top:0}
   </div>
 </div>
 
+<!-- Modal: cotización en curso -->
+<div id="modalCotizacion" class="modal hidden">
+  <div class="modal-card" style="max-width:640px">
+    <h3>Cotización <button id="btnCerrarCotizacion" class="icon-btn">✕</button></h3>
+    <div class="cot-links">
+      <a id="lnkDatosNegocio">⚙️ Datos del negocio</a>
+      <a id="lnkHistorial">🕘 Cotizaciones anteriores</a>
+    </div>
+
+    <label class="field-label">Cliente *</label>
+    <input id="cotClienteNombre" type="text" placeholder="Nombre del cliente">
+    <div class="mapeo-inline" style="margin-top:8px">
+      <div><label class="field-label">Teléfono</label><input id="cotClienteTelefono" type="text"></div>
+      <div><label class="field-label">Empresa</label><input id="cotClienteEmpresa" type="text"></div>
+    </div>
+    <label class="field-label">NIT / Cédula</label>
+    <input id="cotClienteNit" type="text">
+
+    <div class="cot-utilidad">
+      <div>
+        <label class="field-label">% de utilidad para toda la cotización</label>
+        <input id="cotUtilidadGlobal" type="number" min="0" step="1">
+      </div>
+      <button id="btnAplicarUtilidad" class="btn btn-sec btn-sm">Aplicar a todos</button>
+    </div>
+
+    <div id="cotItems"></div>
+    <div id="cotVacio" class="sin-resultados hidden">Todavía no has agregado productos. Cierra esto y toca "+ Cotización" en los productos que quieras cotizar.</div>
+
+    <div class="cot-total"><span>Total</span><span id="cotTotal">$0</span></div>
+
+    <div class="modal-actions">
+      <button id="btnVaciarCotizacion" class="btn btn-sec">Vaciar</button>
+      <button id="btnGenerarPdf" class="btn">Generar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: datos del negocio -->
+<div id="modalNegocio" class="modal hidden">
+  <div class="modal-card">
+    <h3>Datos del negocio <button id="btnCerrarNegocio" class="icon-btn">✕</button></h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:6px">Aparecen en el encabezado del PDF de cotización.</p>
+    <label class="field-label">Nombre del negocio</label>
+    <input id="negNombre" type="text" placeholder="TSI Seguridad Electrónica">
+    <label class="field-label">NIT</label>
+    <input id="negNit" type="text">
+    <label class="field-label">Teléfono / WhatsApp</label>
+    <input id="negTelefono" type="text">
+    <label class="field-label">Logo (opcional)</label>
+    <input id="negLogo" type="file" accept="image/*">
+    <div id="negLogoPreview" style="margin-top:8px"></div>
+    <div class="modal-actions">
+      <button id="btnGuardarNegocio" class="btn">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: historial de cotizaciones -->
+<div id="modalHistorial" class="modal hidden">
+  <div class="modal-card">
+    <h3>Cotizaciones anteriores <button id="btnCerrarHistorial" class="icon-btn">✕</button></h3>
+    <div id="histLista"></div>
+  </div>
+</div>
+
+<!-- Modal: PDF listo -->
+<div id="modalPdfListo" class="modal hidden">
+  <div class="modal-card" style="max-width:380px;text-align:center">
+    <h3>PDF generado ✅ <button id="btnCerrarPdfListo" class="icon-btn">✕</button></h3>
+    <p style="color:var(--muted);font-size:13.5px;margin-bottom:16px">Cotización No. <span id="pdfListoNumero"></span> guardada en el historial.</p>
+    <div class="modal-actions" style="justify-content:center">
+      <button id="btnCompartirPdf" class="btn hidden">Compartir por WhatsApp</button>
+      <button id="btnDescargarPdf" class="btn btn-sec">Descargar PDF</button>
+    </div>
+  </div>
+</div>
+
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
 <script src="js/db.js"></script>
 <script src="js/xlsx-images.js"></script>
 <script src="js/parser-gvs.js"></script>
@@ -215,6 +321,8 @@ table th{background:var(--card2);position:sticky;top:0}
 <script src="js/search.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/import-wizard.js"></script>
+<script src="js/cotizador.js"></script>
+<script src="js/pdf-cotizacion.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

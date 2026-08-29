@@ -60,6 +60,7 @@ TC.ui = (function () {
         ${fichaHtml}
         <button class="btn btn-sec btn-sm act-editar">Ajustar precio / nota</button>
         <button class="btn btn-sec btn-sm act-alternativas">Ver alternativas</button>
+        <button class="btn btn-sm act-agregar-cotizacion">+ Cotización</button>
       </div>
       <div class="alternativas hidden"></div>
     </div>`;
@@ -106,5 +107,48 @@ TC.ui = (function () {
     if (valores.includes(actual)) select.value = actual;
   }
 
-  return { escapeHtml, moneda, renderResultados, renderAlternativas, renderStats, llenarSelect, tarjetaProducto };
+  function cotizacionItemHtml(item) {
+    const media = item.imagenUrl
+      ? `<img src="${escapeHtml(item.imagenUrl)}" alt="">`
+      : '<div class="sin-foto">📦</div>';
+    return `
+    <div class="cot-item" data-id="${escapeHtml(item.productoId)}">
+      <div class="cot-item-media">${media}</div>
+      <div class="cot-item-main">
+        <span class="codigo">${escapeHtml(item.codigo)}</span>
+        <div class="cot-item-desc">${escapeHtml(item.descripcion || '(sin descripción)')}</div>
+        <div class="cot-item-fields">
+          <div><label>Cant.</label><input type="number" min="1" step="1" class="cot-cantidad" value="${item.cantidad}"></div>
+          <div><label>% Util.</label><input type="number" min="0" step="1" class="cot-margen" value="${item.margenPorcentaje != null ? item.margenPorcentaje : ''}"></div>
+          <div><label>Precio venta</label><input type="number" min="0" step="1" class="cot-precio" value="${item.precioVenta != null ? item.precioVenta : ''}"></div>
+        </div>
+      </div>
+      <div class="cot-item-subtotal">${moneda(item.subtotal)}</div>
+      <button class="cot-item-quitar" title="Quitar">✕</button>
+    </div>`;
+  }
+
+  function renderCotizacionItems(container, items) {
+    container.innerHTML = items.map(cotizacionItemHtml).join('');
+  }
+
+  function renderHistorial(container, cotizaciones) {
+    if (!cotizaciones.length) {
+      container.innerHTML = '<div class="sin-resultados">Todavía no has generado ninguna cotización.</div>';
+      return;
+    }
+    container.innerHTML = cotizaciones.map(c => `
+      <div class="hist-row" data-id="${escapeHtml(c.id)}">
+        <div class="hist-row-info">
+          <b>Cotización No. ${c.numero} — ${escapeHtml(c.cliente.nombre || 'Sin nombre')}</b>
+          <span>${new Date(c.fecha).toLocaleDateString('es-CO')} · ${c.items.length} producto(s) · ${moneda(c.total)}</span>
+        </div>
+        <button class="btn btn-sec btn-sm hist-reenviar">Reenviar PDF</button>
+      </div>`).join('');
+  }
+
+  return {
+    escapeHtml, moneda, renderResultados, renderAlternativas, renderStats, llenarSelect,
+    tarjetaProducto, renderCotizacionItems, renderHistorial
+  };
 })();
