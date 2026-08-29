@@ -6,16 +6,20 @@ var TC = window.TC || (window.TC = {});
 
 TC.importWizard = (function () {
   const CAMPOS_MAPEO = [
-    { key: 'codigo', label: 'Código *' },
-    { key: 'descripcion', label: 'Descripción *' },
-    { key: 'precioSinIVA', label: 'Precio sin IVA' },
-    { key: 'precioConIVA', label: 'Precio con IVA' },
-    { key: 'marca', label: 'Marca' },
-    { key: 'categoria', label: 'Categoría' },
-    { key: 'subcategoria', label: 'Subcategoría' },
-    { key: 'textoStock', label: 'Texto de existencia/stock' },
-    { key: 'urlFicha', label: 'URL ficha técnica' }
+    { key: 'codigo', label: 'Código *', alias: ['codigo', 'referencia', 'sku', 'ref'] },
+    { key: 'descripcion', label: 'Descripción *', alias: ['descripcion', 'nombre', 'producto', 'detalle'] },
+    { key: 'precioSinIVA', label: 'Precio sin IVA', alias: ['preciosiniva', 'antesdeiva', 'precio', 'valorsiniva'] },
+    { key: 'precioConIVA', label: 'Precio con IVA', alias: ['precioconiva', 'incluidoiva', 'valorconiva', 'preciototal'] },
+    { key: 'marca', label: 'Marca', alias: ['marca', 'fabricante'] },
+    { key: 'categoria', label: 'Categoría', alias: ['categoria', 'linea', 'grupo'] },
+    { key: 'subcategoria', label: 'Subcategoría', alias: ['subcategoria', 'familia'] },
+    { key: 'textoStock', label: 'Texto de existencia/stock', alias: ['estado', 'stock', 'existencia', 'disponibilidad'] },
+    { key: 'urlFicha', label: 'URL ficha técnica', alias: ['urlficha', 'ficha', 'url', 'enlace', 'link'] }
   ];
+
+  function normalizarEncabezado(s) {
+    return (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+  }
 
   let state = {};
   let onImportado = null;
@@ -170,9 +174,19 @@ TC.importWizard = (function () {
       </div>`).join('');
 
     const filaInicioSugerida = TC.parserGenerico.sugerirFilaInicio(ws);
-    const colCodigoSugerida = TC.parserGenerico.sugerirColumnaCodigo(ws, filaInicioSugerida, ancho);
+    const filaEncabezado = filas[Math.max(0, Math.min(filaInicioSugerida - 1, filas.length - 1))] || [];
+    const encabezadosNorm = filaEncabezado.map(normalizarEncabezado);
+
+    CAMPOS_MAPEO.forEach(campo => {
+      const sel = els.mapeoForm.querySelector(`[data-campo="${campo.key}"]`);
+      const col = encabezadosNorm.findIndex(h => h && campo.alias.includes(h));
+      if (col !== -1) sel.value = String(col);
+    });
+
     const selCodigo = els.mapeoForm.querySelector('[data-campo="codigo"]');
-    selCodigo.value = String(colCodigoSugerida);
+    if (!selCodigo.value) {
+      selCodigo.value = String(TC.parserGenerico.sugerirColumnaCodigo(ws, filaInicioSugerida, ancho));
+    }
     els.filaInicio.value = filaInicioSugerida;
     els.ivaPorcentaje.value = 19;
   }
