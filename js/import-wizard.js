@@ -120,6 +120,12 @@ TC.importWizard = (function () {
       state.productos = resultado.productos;
       state.hojasProcesadas = resultado.hojasProcesadas;
       state.fechaProveedor = null;
+      // dejar la hoja de mapeo lista por si el usuario aprieta "Editar mapeo":
+      // el perfil guardado pudo haberse hecho contra un archivo con otras columnas.
+      state.hojasSeleccionadas = perfil.hojas.filter(h => workbook.SheetNames.includes(h));
+      if (state.hojasSeleccionadas.length === 0) state.hojasSeleccionadas = workbook.SheetNames;
+      renderListaHojas(workbook.SheetNames, state.hojasSeleccionadas);
+      renderMapeo(state.hojasSeleccionadas[0]);
       await procesarImagenesYConfirmar(buf, true);
     } else {
       renderListaHojas(workbook.SheetNames);
@@ -127,10 +133,11 @@ TC.importWizard = (function () {
     }
   }
 
-  function renderListaHojas(nombres) {
-    els.listaHojas.innerHTML = nombres.map((n, i) => `
+  function renderListaHojas(nombres, marcadas) {
+    marcadas = marcadas || [nombres[0]];
+    els.listaHojas.innerHTML = nombres.map((n) => `
       <label class="check-row">
-        <input type="checkbox" value="${TC.ui.escapeHtml(n)}" ${i === 0 ? 'checked' : ''}>
+        <input type="checkbox" value="${TC.ui.escapeHtml(n)}" ${marcadas.includes(n) ? 'checked' : ''}>
         ${TC.ui.escapeHtml(n)}
       </label>`).join('');
   }
