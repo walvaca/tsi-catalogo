@@ -20,7 +20,10 @@ TC.cotizador = (function () {
   }
 
   function vacio() {
-    return { cliente: { nombre: '', telefono: '', empresa: '', nit: '' }, items: [] };
+    return {
+      cliente: { nombre: '', telefono: '', empresa: '', nit: '', direccion: '', ciudadEntrega: 'local' },
+      items: []
+    };
   }
 
   function guardar(borrador) {

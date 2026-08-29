@@ -249,6 +249,13 @@ table th{background:var(--card2);position:sticky;top:0}
     </div>
     <label class="field-label">NIT / Cédula</label>
     <input id="cotClienteNit" type="text">
+    <label class="field-label">Dirección de entrega</label>
+    <input id="cotClienteDireccion" type="text" placeholder="Calle, barrio, ciudad">
+    <label class="field-label">Domicilio</label>
+    <select id="cotCiudadEntrega">
+      <option value="local">Bogotá / Soacha — domicilio sin costo</option>
+      <option value="fuera">Fuera de Bogotá/Soacha — envío a cargo del cliente</option>
+    </select>
 
     <div class="cot-utilidad">
       <div>

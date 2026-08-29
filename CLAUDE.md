@@ -150,13 +150,18 @@ consola — conviene revisarlas a mano si aparecen más al convertir un PDF futu
 sobre todo si Tecnomax cambia el diseño del documento.
 
 ## Cotizador (`js/cotizador.js` + `js/pdf-cotizacion.js`)
-Desde cualquier tarjeta de producto, "+ Cotización" la agrega a un **borrador**
-(`localStorage`, clave `tsiCatalogoCotizacionDraft` — ver arriba por qué no va a
-IndexedDB). "Utilidad" es **markup sobre el costo**: `precioVenta = costo_con_IVA ×
-(1 + %/100)`, no margen sobre el precio de venta — es la forma más común de pensarlo
-("le subo un 20%"). Hay un % global (`aplicarUtilidadATodos`) y cada ítem lo puede
-sobreescribir; si el usuario edita el precio de venta directo en vez del %, el % se
-recalcula al revés solo como referencia (`actualizarItem` en `cotizador.js`).
+Desde cualquier tarjeta de producto, "🛒 Agregar a cotización" la agrega a un
+**borrador** (`localStorage`, clave `tsiCatalogoCotizacionDraft` — ver arriba por qué
+no va a IndexedDB). "Utilidad" es **markup sobre el costo**: `precioVenta =
+costo_con_IVA × (1 + %/100)`, no margen sobre el precio de venta — es la forma más
+común de pensarlo ("le subo un 20%"). Hay un % global (`aplicarUtilidadATodos`) y cada
+ítem lo puede sobreescribir; si el usuario edita el precio de venta directo en vez del
+%, el % se recalcula al revés solo como referencia (`actualizarItem` en `cotizador.js`).
+
+El formulario de cliente incluye **dirección de entrega** y un selector de ciudad con
+la regla comercial real de TSI: domicilio sin costo dentro de Bogotá/Soacha, a cargo
+del cliente fuera de esa zona (`notaCiudad()` en `pdf-cotizacion.js` traduce esto a la
+frase que aparece en el PDF).
 
 Al generar el PDF (`TC.pdfCotizacion.generar`, jsPDF + autotable): se arma el objeto
 final con número secuencial (`configuracion.siguienteNumero`, IndexedDB), se guarda
@@ -171,8 +176,24 @@ Un producto sin precio (agotado/consultar) se puede agregar igual — el ítem a
 costo base.
 
 **Datos del negocio** (nombre, NIT, teléfono, logo) están en el store `configuracion`
-(un solo registro, `id: 'negocio'`) y aparecen en el encabezado del PDF si están
-configurados — si no, el PDF se genera igual, solo sin esa sección.
+(un solo registro, `id: 'negocio'`) y aparecen en el encabezado del PDF. Los valores por
+defecto (`NEGOCIO_POR_DEFECTO` en `db.js`) ya traen los datos reales de TSI — nombre
+legal, NIT y WhatsApp — para que la primera cotización salga con membrete correcto
+aunque el usuario no haya abierto "Datos del negocio" todavía; si configura los suyos
+propios, esos prevalecen.
+
+**Diseño del PDF: "documento ejecutivo"**, siguiendo una plantilla de referencia que
+el usuario aprobó (no la navy-band de la primera versión): encabezado plano con
+logo + nombre, línea divisoria, una tabla tipo ficha con los datos del cliente
+(incluida la dirección/ciudad), la tabla de ítems, una tabla de totales con el IVA
+**desglosado del mismo total ya calculado** (costo + utilidad) — no se suma nada
+encima, es solo informativo (`subtotalSinIVA = total / 1.19`) —, una sección de
+"Alcance y condiciones" con los términos reales de TSI (garantía 12 meses, instalación
+aparte, 50/50 anticipo, vigencia 8 días — las cotizaciones de productos cambian de
+precio seguido, a diferencia de los 30 días que maneja el portafolio de servicios), y
+un pie de página centrado que repite en cada página con el portafolio de servicios de
+TSI (CCTV+IA, control de acceso, alarmas, redes, soporte) a modo de publicidad — todo
+tomado del material de marca real de TSI (`logo-tsi.png`, colores navy `#0d1421`).
 
 ## Seguridad / límites deliberados (no negociable)
 - **Nunca automatizar login ni scraping** de los portales de GVS/Tecnomax con las

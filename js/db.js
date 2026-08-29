@@ -145,10 +145,22 @@ TC.db = (function () {
     return txDone(t);
   }
 
+  // Datos reales de la empresa (tarjeta de presentación / portafolio de servicios
+  // 2026) — se usan como valor por defecto mientras el usuario no configure los suyos,
+  // así la primera cotización ya sale con membrete correcto.
+  const NEGOCIO_POR_DEFECTO = {
+    id: 'negocio',
+    nombreNegocio: 'TSI — Technology & Security Intelligence S.A.S.',
+    nit: '902.058.899-6',
+    telefono: '+57 310 756 7232',
+    logoBlob: null,
+    siguienteNumero: 1
+  };
+
   async function getConfigNegocio() {
     const t = await tx('configuracion', 'readonly');
     const cfg = await reqToPromise(t.objectStore('configuracion').get('negocio'));
-    return cfg || { id: 'negocio', nombreNegocio: '', nit: '', telefono: '', logoBlob: null, siguienteNumero: 1 };
+    return cfg || Object.assign({}, NEGOCIO_POR_DEFECTO);
   }
 
   async function putConfigNegocio(cfg) {

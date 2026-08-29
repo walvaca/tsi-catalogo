@@ -60,7 +60,7 @@ TC.ui = (function () {
         ${fichaHtml}
         <button class="btn btn-sec btn-sm act-editar">Ajustar precio / nota</button>
         <button class="btn btn-sec btn-sm act-alternativas">Ver alternativas</button>
-        <button class="btn btn-sm act-agregar-cotizacion">+ Cotización</button>
+        <button class="btn btn-sm act-agregar-cotizacion">🛒 Agregar a cotización</button>
       </div>
       <div class="alternativas hidden"></div>
     </div>`;

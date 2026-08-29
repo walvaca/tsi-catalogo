@@ -107,6 +107,8 @@ var TC = window.TC || (window.TC = {});
     els.cotClienteTelefono.value = borrador.cliente.telefono || '';
     els.cotClienteEmpresa.value = borrador.cliente.empresa || '';
     els.cotClienteNit.value = borrador.cliente.nit || '';
+    els.cotClienteDireccion.value = borrador.cliente.direccion || '';
+    els.cotCiudadEntrega.value = borrador.cliente.ciudadEntrega || 'local';
     els.cotUtilidadGlobal.value = TC.cotizador.utilidadGlobal();
 
     const { items, total } = TC.cotizador.calcularTotales(borrador);
@@ -129,7 +131,9 @@ var TC = window.TC || (window.TC = {});
       nombre: els.cotClienteNombre.value.trim(),
       telefono: els.cotClienteTelefono.value.trim(),
       empresa: els.cotClienteEmpresa.value.trim(),
-      nit: els.cotClienteNit.value.trim()
+      nit: els.cotClienteNit.value.trim(),
+      direccion: els.cotClienteDireccion.value.trim(),
+      ciudadEntrega: els.cotCiudadEntrega.value
     });
   }
 
@@ -331,6 +335,8 @@ var TC = window.TC || (window.TC = {});
       cotClienteTelefono: $('cotClienteTelefono'),
       cotClienteEmpresa: $('cotClienteEmpresa'),
       cotClienteNit: $('cotClienteNit'),
+      cotClienteDireccion: $('cotClienteDireccion'),
+      cotCiudadEntrega: $('cotCiudadEntrega'),
       cotUtilidadGlobal: $('cotUtilidadGlobal'),
       btnAplicarUtilidad: $('btnAplicarUtilidad'),
       cotItems: $('cotItems'),
@@ -375,7 +381,8 @@ var TC = window.TC || (window.TC = {});
     els.btnCotizacion.addEventListener('click', abrirCotizacion);
     els.btnCerrarCotizacion.addEventListener('click', () => { guardarClienteBorrador(); cerrarCotizacion(); });
     els.modalCotizacion.addEventListener('click', e => { if (e.target === els.modalCotizacion) { guardarClienteBorrador(); cerrarCotizacion(); } });
-    [els.cotClienteNombre, els.cotClienteTelefono, els.cotClienteEmpresa, els.cotClienteNit].forEach(input =>
+    [els.cotClienteNombre, els.cotClienteTelefono, els.cotClienteEmpresa, els.cotClienteNit,
+     els.cotClienteDireccion, els.cotCiudadEntrega].forEach(input =>
       input.addEventListener('change', guardarClienteBorrador));
     els.cotItems.addEventListener('change', onChangeCotItems);
     els.cotItems.addEventListener('click', onClickCotItems);
