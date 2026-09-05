@@ -8,6 +8,14 @@ var TC = window.TC || (window.TC = {});
   let editandoId = null;
   let imagenUrls = new Map();
 
+  // CRM: clientes / casos
+  let clientesCacheCRM = [];
+  let clienteActualCRM = null;
+  let casoActualCRM = null;
+  let tipoCasoNuevo = null;
+  let modoClienteForm = 'crear';
+  let eventoArchivoUrls = new Map();
+
   const $ = id => document.getElementById(id);
   let els = {};
 
@@ -140,6 +148,7 @@ var TC = window.TC || (window.TC = {});
     els.cotClienteDireccion.value = borrador.cliente.direccion || '';
     els.cotCiudadEntrega.value = borrador.cliente.ciudadEntrega || 'local';
     els.cotUtilidadGlobal.value = TC.cotizador.utilidadGlobal();
+    actualizarVinculoClienteUI(borrador.cliente.crmClienteId);
 
     const { items, total } = TC.cotizador.calcularTotales(borrador);
     els.cotVacio.classList.toggle('hidden', items.length > 0);
@@ -147,9 +156,67 @@ var TC = window.TC || (window.TC = {});
     els.cotTotal.textContent = TC.ui.moneda(total);
   }
 
-  function abrirCotizacion() {
+  async function abrirCotizacion() {
+    clientesCacheCRM = await TC.crm.listarClientes();
     renderCotizacionModal();
     els.modalCotizacion.classList.remove('hidden');
+  }
+
+  function actualizarVinculoClienteUI(crmClienteId) {
+    const vinculado = !!crmClienteId;
+    els.cotClienteBuscar.classList.toggle('hidden', vinculado);
+    els.cotClienteSugerencias.classList.add('hidden');
+    els.cotClienteVinculadoInfo.classList.toggle('hidden', !vinculado);
+    if (vinculado) {
+      const cliente = clientesCacheCRM.find(c => c.id === crmClienteId);
+      els.cotClienteVinculadoNombre.textContent = cliente ? cliente.nombre : '(cliente)';
+    } else {
+      els.cotClienteBuscar.value = '';
+    }
+  }
+
+  function onInputClienteBuscar() {
+    const q = els.cotClienteBuscar.value.trim();
+    if (!q) { els.cotClienteSugerencias.classList.add('hidden'); return; }
+    const coincidencias = TC.crm.filtrarClientes(clientesCacheCRM, q);
+    TC.ui.renderSugerenciasCliente(els.cotClienteSugerencias, coincidencias);
+    els.cotClienteSugerencias.insertAdjacentHTML('beforeend',
+      `<div class="sugerencia-cliente" data-crear-nuevo="1"><b>＋ Crear cliente nuevo: "${TC.ui.escapeHtml(q)}"</b></div>`);
+    els.cotClienteSugerencias.classList.remove('hidden');
+  }
+
+  async function onClickClienteSugerencias(e) {
+    const fila = e.target.closest('.sugerencia-cliente');
+    if (!fila) return;
+    let clienteId;
+    if (fila.dataset.crearNuevo) {
+      const nombre = els.cotClienteNombre.value.trim() || els.cotClienteBuscar.value.trim();
+      const cliente = await TC.crm.crearCliente({
+        nombre,
+        telefono: els.cotClienteTelefono.value.trim(),
+        empresa: els.cotClienteEmpresa.value.trim(),
+        nit: els.cotClienteNit.value.trim()
+      });
+      clientesCacheCRM.push(cliente);
+      clienteId = cliente.id;
+    } else {
+      clienteId = fila.dataset.id;
+    }
+    TC.cotizador.actualizarCliente({ crmClienteId: clienteId });
+    const cliente = clientesCacheCRM.find(c => c.id === clienteId);
+    if (cliente) {
+      if (!els.cotClienteNombre.value.trim()) els.cotClienteNombre.value = cliente.nombre || '';
+      if (!els.cotClienteTelefono.value.trim()) els.cotClienteTelefono.value = cliente.telefono || '';
+      if (!els.cotClienteEmpresa.value.trim()) els.cotClienteEmpresa.value = cliente.empresa || '';
+      if (!els.cotClienteNit.value.trim()) els.cotClienteNit.value = cliente.nit || '';
+      guardarClienteBorrador();
+    }
+    renderCotizacionModal();
+  }
+
+  function quitarVinculoCliente() {
+    TC.cotizador.actualizarCliente({ crmClienteId: null });
+    renderCotizacionModal();
   }
 
   function cerrarCotizacion() {
@@ -205,6 +272,10 @@ var TC = window.TC || (window.TC = {});
       const config = await TC.db.getConfigNegocio();
       const blob = await TC.pdfCotizacion.generar(cotizacion, config);
       await TC.db.putCotizacion(Object.assign({}, cotizacion, { pdfBlob: blob }));
+      if (cotizacion.cliente.crmClienteId) {
+        try { await vincularCotizacionACaso(cotizacion.cliente.crmClienteId, cotizacion); }
+        catch (err) { console.error('No se pudo vincular la cotización al CRM:', err); }
+      }
       TC.cotizador.vaciar();
       actualizarBadgeCotizacion();
       cerrarCotizacion();
@@ -216,6 +287,17 @@ var TC = window.TC || (window.TC = {});
       els.btnGenerarPdf.disabled = false;
       els.btnGenerarPdf.textContent = 'Generar PDF';
     }
+  }
+
+  async function vincularCotizacionACaso(clienteId, cotizacion) {
+    const casos = await TC.crm.listarCasosPorCliente(clienteId);
+    let caso = casos.find(c => c.tipo === 'producto' && c.etapaActual !== 'cerrado');
+    if (!caso) caso = await TC.crm.crearCaso(clienteId, 'producto', `Cotización No. ${cotizacion.numero}`);
+    await TC.crm.agregarEvento(caso.id, {
+      tipo: 'cotizacion', fecha: cotizacion.fecha,
+      descripcion: `Cotización No. ${cotizacion.numero} — ${TC.ui.moneda(cotizacion.total)}`,
+      cotizacionId: cotizacion.id
+    });
   }
 
   function ofrecerPdf(blob, numero) {
@@ -290,6 +372,206 @@ var TC = window.TC || (window.TC = {});
     const fila = e.target.closest('.hist-row');
     const cot = historialCache.find(c => c.id === fila.dataset.id);
     if (cot && cot.pdfBlob) ofrecerPdf(cot.pdfBlob, cot.numero);
+  }
+
+  // ===== CRM: clientes y casos =====
+
+  function mostrarPanelClientes(nombre) {
+    ['clnListado', 'clnNuevoCliente', 'clnDetalleCliente', 'clnDetalleCaso'].forEach(id => {
+      els[id].classList.toggle('hidden', id !== nombre);
+    });
+  }
+
+  async function abrirClientes() {
+    clientesCacheCRM = await TC.crm.listarClientes();
+    TC.ui.renderClientes(els.clnListaClientes, clientesCacheCRM);
+    els.clnBuscarCliente.value = '';
+    mostrarPanelClientes('clnListado');
+    els.modalClientes.classList.remove('hidden');
+  }
+
+  function cerrarClientes() {
+    els.modalClientes.classList.add('hidden');
+  }
+
+  function onInputBuscarClientes() {
+    const filtrados = TC.crm.filtrarClientes(clientesCacheCRM, els.clnBuscarCliente.value);
+    TC.ui.renderClientes(els.clnListaClientes, filtrados);
+  }
+
+  function onClickListaClientes(e) {
+    const fila = e.target.closest('.cln-cliente-row');
+    if (!fila) return;
+    abrirDetalleCliente(fila.dataset.id);
+  }
+
+  function limpiarFormCliente() {
+    ['clnNombre', 'clnEmpresa', 'clnNit', 'clnTelefono', 'clnEmail', 'clnDireccion', 'clnCiudad', 'clnNotas']
+      .forEach(id => { els[id].value = ''; });
+  }
+
+  function abrirFormNuevoCliente() {
+    modoClienteForm = 'crear';
+    limpiarFormCliente();
+    els.clnVolverForm.dataset.volver = 'clnListado';
+    mostrarPanelClientes('clnNuevoCliente');
+  }
+
+  function abrirFormEditarCliente() {
+    if (!clienteActualCRM) return;
+    modoClienteForm = 'editar';
+    els.clnNombre.value = clienteActualCRM.nombre || '';
+    els.clnEmpresa.value = clienteActualCRM.empresa || '';
+    els.clnNit.value = clienteActualCRM.nit || '';
+    els.clnTelefono.value = clienteActualCRM.telefono || '';
+    els.clnEmail.value = clienteActualCRM.email || '';
+    els.clnDireccion.value = clienteActualCRM.direccion || '';
+    els.clnCiudad.value = clienteActualCRM.ciudad || '';
+    els.clnNotas.value = clienteActualCRM.notas || '';
+    els.clnVolverForm.dataset.volver = 'clnDetalleCliente';
+    mostrarPanelClientes('clnNuevoCliente');
+  }
+
+  async function guardarCliente() {
+    const datos = {
+      nombre: els.clnNombre.value.trim(),
+      empresa: els.clnEmpresa.value.trim(),
+      nit: els.clnNit.value.trim(),
+      telefono: els.clnTelefono.value.trim(),
+      email: els.clnEmail.value.trim(),
+      direccion: els.clnDireccion.value.trim(),
+      ciudad: els.clnCiudad.value.trim(),
+      notas: els.clnNotas.value.trim()
+    };
+    if (!datos.nombre) { alert('Escribe el nombre del cliente.'); return; }
+
+    let clienteId;
+    if (modoClienteForm === 'editar' && clienteActualCRM) {
+      await TC.crm.actualizarCliente(clienteActualCRM.id, datos);
+      clienteId = clienteActualCRM.id;
+    } else {
+      const cliente = await TC.crm.crearCliente(datos);
+      clienteId = cliente.id;
+    }
+    clientesCacheCRM = await TC.crm.listarClientes();
+    await abrirDetalleCliente(clienteId);
+  }
+
+  async function abrirDetalleCliente(clienteId) {
+    clienteActualCRM = await TC.crm.obtenerCliente(clienteId);
+    if (!clienteActualCRM) return;
+    els.clnDetalleNombre.textContent = clienteActualCRM.nombre || '(sin nombre)';
+    els.clnDetalleMeta.textContent = [clienteActualCRM.empresa, clienteActualCRM.telefono, clienteActualCRM.email]
+      .filter(Boolean).join(' · ') || 'Sin datos de contacto adicionales';
+    els.clnNuevoCasoForm.classList.add('hidden');
+    const casos = await TC.crm.listarCasosPorCliente(clienteId);
+    TC.ui.renderCasos(els.clnListaCasos, casos);
+    mostrarPanelClientes('clnDetalleCliente');
+  }
+
+  function abrirFormNuevoCaso(tipo) {
+    tipoCasoNuevo = tipo;
+    els.clnTituloCaso.value = '';
+    els.clnNuevoCasoForm.classList.remove('hidden');
+  }
+
+  async function guardarCasoNuevo() {
+    const titulo = els.clnTituloCaso.value.trim();
+    if (!titulo) { alert('Escribe un título para el caso.'); return; }
+    const caso = await TC.crm.crearCaso(clienteActualCRM.id, tipoCasoNuevo, titulo);
+    els.clnNuevoCasoForm.classList.add('hidden');
+    await abrirDetalleCaso(caso.id);
+  }
+
+  function onClickListaCasos(e) {
+    const fila = e.target.closest('.cln-caso-row');
+    if (!fila) return;
+    abrirDetalleCaso(fila.dataset.id);
+  }
+
+  async function recargarTimeline(casoId) {
+    const eventos = await TC.crm.listarEventosPorCaso(casoId);
+    for (const url of eventoArchivoUrls.values()) URL.revokeObjectURL(url);
+    eventoArchivoUrls = new Map();
+    for (const ev of eventos) {
+      for (const archivo of (ev.archivos || [])) {
+        const url = URL.createObjectURL(archivo.blob);
+        eventoArchivoUrls.set(ev.id + '::' + archivo.nombre, url);
+        archivo._url = url;
+      }
+    }
+    TC.ui.renderTimeline(els.clnTimeline, eventos);
+  }
+
+  async function onCambiarEtapaCaso() {
+    if (!casoActualCRM) return;
+    casoActualCRM = await TC.crm.cambiarEtapa(casoActualCRM.id, els.clnEtapaCaso.value);
+  }
+
+  function onChangeTipoEventoCaso() {
+    const tipo = els.clnTipoEvento.value;
+    els.clnMontoWrap.classList.toggle('hidden', tipo !== 'pago' && tipo !== 'costo');
+    els.clnCotizacionWrap.classList.toggle('hidden', tipo !== 'cotizacion');
+  }
+
+  async function abrirDetalleCaso(casoId) {
+    casoActualCRM = await TC.crm.obtenerCaso(casoId);
+    if (!casoActualCRM) return;
+    const cliente = await TC.crm.obtenerCliente(casoActualCRM.clienteId);
+
+    els.clnCasoTitulo.textContent = casoActualCRM.titulo;
+    els.clnCasoMeta.textContent =
+      `${casoActualCRM.tipo === 'servicio' ? 'Servicio técnico' : 'Venta de producto'} · ${cliente ? cliente.nombre : ''}`;
+    TC.ui.llenarSelectEtapas(els.clnEtapaCaso, TC.crm.etapasPara(casoActualCRM.tipo), casoActualCRM.etapaActual);
+    els.clnTotalCotizado.textContent = TC.ui.moneda(casoActualCRM.totalCotizado);
+    els.clnTotalCobrado.textContent = TC.ui.moneda(casoActualCRM.totalCobrado);
+    els.clnTotalCostos.textContent = TC.ui.moneda(casoActualCRM.totalCostos);
+    els.clnGarantiaHasta.textContent = casoActualCRM.garantiaVigenteHasta
+      ? new Date(casoActualCRM.garantiaVigenteHasta).toLocaleDateString('es-CO') : '—';
+
+    els.clnTipoEvento.value = 'cotizacion';
+    els.clnFechaEvento.value = new Date().toISOString().slice(0, 10);
+    els.clnMontoEvento.value = '';
+    els.clnDescripcionEvento.value = '';
+    els.clnArchivosEvento.value = '';
+    onChangeTipoEventoCaso();
+
+    const cotizaciones = await TC.db.getCotizaciones();
+    els.clnCotizacionEvento.innerHTML = '<option value="">— Ninguna —</option>' +
+      cotizaciones.map(c => `<option value="${c.id}">No. ${c.numero} — ${TC.ui.escapeHtml(c.cliente.nombre || '')} — ${TC.ui.moneda(c.total)}</option>`).join('');
+
+    await recargarTimeline(casoId);
+    mostrarPanelClientes('clnDetalleCaso');
+  }
+
+  function leerArchivos(fileList) {
+    return Array.from(fileList).map(file => ({ nombre: file.name, tipo: file.type, blob: file }));
+  }
+
+  async function onClickAgregarEvento() {
+    if (!casoActualCRM) return;
+    const tipo = els.clnTipoEvento.value;
+    // Ojo: "YYYY-MM-DD" a secas se interpreta como medianoche UTC, y en zonas
+    // horarias negativas (Colombia, UTC-5) eso cae en el día anterior al
+    // mostrarlo en local — por eso se ancla a mediodía local, no a la fecha tal cual.
+    const fecha = els.clnFechaEvento.value ? new Date(els.clnFechaEvento.value + 'T12:00:00').toISOString() : new Date().toISOString();
+    const monto = els.clnMontoEvento.value.trim() !== '' ? parseFloat(els.clnMontoEvento.value) : null;
+    const cotizacionId = els.clnCotizacionEvento.value || null;
+    const archivos = leerArchivos(els.clnArchivosEvento.files);
+
+    await TC.crm.agregarEvento(casoActualCRM.id, {
+      tipo, fecha, descripcion: els.clnDescripcionEvento.value.trim(), archivos, monto, cotizacionId
+    });
+    await abrirDetalleCaso(casoActualCRM.id);
+  }
+
+  async function onClickTimeline(e) {
+    const btn = e.target.closest('.evento-eliminar');
+    if (!btn) return;
+    const fila = e.target.closest('.evento-caso');
+    if (!confirm('¿Eliminar este evento de la bitácora?')) return;
+    await TC.crm.eliminarEvento(fila.dataset.id, casoActualCRM.id);
+    await abrirDetalleCaso(casoActualCRM.id);
   }
 
   function abrirModalEditar(id) {
@@ -371,6 +653,11 @@ var TC = window.TC || (window.TC = {});
       cotClienteNit: $('cotClienteNit'),
       cotClienteDireccion: $('cotClienteDireccion'),
       cotCiudadEntrega: $('cotCiudadEntrega'),
+      cotClienteBuscar: $('cotClienteBuscar'),
+      cotClienteSugerencias: $('cotClienteSugerencias'),
+      cotClienteVinculadoInfo: $('cotClienteVinculadoInfo'),
+      cotClienteVinculadoNombre: $('cotClienteVinculadoNombre'),
+      cotClienteQuitarVinculo: $('cotClienteQuitarVinculo'),
       cotUtilidadGlobal: $('cotUtilidadGlobal'),
       btnAplicarUtilidad: $('btnAplicarUtilidad'),
       cotItems: $('cotItems'),
@@ -396,7 +683,55 @@ var TC = window.TC || (window.TC = {});
       btnCerrarPdfListo: $('btnCerrarPdfListo'),
       pdfListoNumero: $('pdfListoNumero'),
       btnCompartirPdf: $('btnCompartirPdf'),
-      btnDescargarPdf: $('btnDescargarPdf')
+      btnDescargarPdf: $('btnDescargarPdf'),
+
+      btnClientes: $('btnClientes'),
+      modalClientes: $('modalClientes'),
+      btnCerrarClientes: $('btnCerrarClientes'),
+      clnListado: $('clnListado'),
+      clnBuscarCliente: $('clnBuscarCliente'),
+      btnNuevoCliente: $('btnNuevoCliente'),
+      clnListaClientes: $('clnListaClientes'),
+      clnNuevoCliente: $('clnNuevoCliente'),
+      clnVolverForm: $('clnVolverForm'),
+      clnNombre: $('clnNombre'),
+      clnEmpresa: $('clnEmpresa'),
+      clnNit: $('clnNit'),
+      clnTelefono: $('clnTelefono'),
+      clnEmail: $('clnEmail'),
+      clnDireccion: $('clnDireccion'),
+      clnCiudad: $('clnCiudad'),
+      clnNotas: $('clnNotas'),
+      btnGuardarCliente: $('btnGuardarCliente'),
+      clnDetalleCliente: $('clnDetalleCliente'),
+      clnDetalleNombre: $('clnDetalleNombre'),
+      clnDetalleMeta: $('clnDetalleMeta'),
+      btnEditarCliente: $('btnEditarCliente'),
+      btnNuevoCasoProducto: $('btnNuevoCasoProducto'),
+      btnNuevoCasoServicio: $('btnNuevoCasoServicio'),
+      clnNuevoCasoForm: $('clnNuevoCasoForm'),
+      clnTituloCaso: $('clnTituloCaso'),
+      btnCancelarCaso: $('btnCancelarCaso'),
+      btnGuardarCaso: $('btnGuardarCaso'),
+      clnListaCasos: $('clnListaCasos'),
+      clnDetalleCaso: $('clnDetalleCaso'),
+      clnCasoTitulo: $('clnCasoTitulo'),
+      clnCasoMeta: $('clnCasoMeta'),
+      clnEtapaCaso: $('clnEtapaCaso'),
+      clnTotalCotizado: $('clnTotalCotizado'),
+      clnTotalCobrado: $('clnTotalCobrado'),
+      clnTotalCostos: $('clnTotalCostos'),
+      clnGarantiaHasta: $('clnGarantiaHasta'),
+      clnTimeline: $('clnTimeline'),
+      clnTipoEvento: $('clnTipoEvento'),
+      clnFechaEvento: $('clnFechaEvento'),
+      clnMontoWrap: $('clnMontoWrap'),
+      clnMontoEvento: $('clnMontoEvento'),
+      clnCotizacionWrap: $('clnCotizacionWrap'),
+      clnCotizacionEvento: $('clnCotizacionEvento'),
+      clnDescripcionEvento: $('clnDescripcionEvento'),
+      clnArchivosEvento: $('clnArchivosEvento'),
+      btnAgregarEvento: $('btnAgregarEvento')
     };
 
     TC.importWizard.init(recargarDatos);
@@ -426,6 +761,9 @@ var TC = window.TC || (window.TC = {});
     [els.cotClienteNombre, els.cotClienteTelefono, els.cotClienteEmpresa, els.cotClienteNit,
      els.cotClienteDireccion, els.cotCiudadEntrega].forEach(input =>
       input.addEventListener('change', guardarClienteBorrador));
+    els.cotClienteBuscar.addEventListener('input', debounce(onInputClienteBuscar, 150));
+    els.cotClienteSugerencias.addEventListener('click', onClickClienteSugerencias);
+    els.cotClienteQuitarVinculo.addEventListener('click', quitarVinculoCliente);
     els.cotItems.addEventListener('change', onChangeCotItems);
     els.cotItems.addEventListener('click', onClickCotItems);
     els.btnAplicarUtilidad.addEventListener('click', () => {
@@ -453,6 +791,38 @@ var TC = window.TC || (window.TC = {});
 
     els.btnCerrarPdfListo.addEventListener('click', () => els.modalPdfListo.classList.add('hidden'));
     els.modalPdfListo.addEventListener('click', e => { if (e.target === els.modalPdfListo) els.modalPdfListo.classList.add('hidden'); });
+
+    els.btnClientes.addEventListener('click', abrirClientes);
+    els.btnCerrarClientes.addEventListener('click', cerrarClientes);
+    els.modalClientes.addEventListener('click', async e => {
+      const volver = e.target.closest('.cln-volver');
+      if (volver) {
+        const destino = volver.dataset.volver;
+        if (destino === 'clnListado') TC.ui.renderClientes(els.clnListaClientes, clientesCacheCRM);
+        if (destino === 'clnDetalleCliente' && clienteActualCRM) {
+          const casos = await TC.crm.listarCasosPorCliente(clienteActualCRM.id);
+          TC.ui.renderCasos(els.clnListaCasos, casos);
+        }
+        mostrarPanelClientes(destino);
+        return;
+      }
+      if (e.target === els.modalClientes) cerrarClientes();
+    });
+    els.clnBuscarCliente.addEventListener('input', debounce(onInputBuscarClientes, 120));
+    els.btnNuevoCliente.addEventListener('click', abrirFormNuevoCliente);
+    els.clnListaClientes.addEventListener('click', onClickListaClientes);
+    els.btnGuardarCliente.addEventListener('click', guardarCliente);
+    els.btnEditarCliente.addEventListener('click', abrirFormEditarCliente);
+    els.btnNuevoCasoProducto.addEventListener('click', () => abrirFormNuevoCaso('producto'));
+    els.btnNuevoCasoServicio.addEventListener('click', () => abrirFormNuevoCaso('servicio'));
+    els.btnCancelarCaso.addEventListener('click', () => els.clnNuevoCasoForm.classList.add('hidden'));
+    els.btnGuardarCaso.addEventListener('click', guardarCasoNuevo);
+    els.clnListaCasos.addEventListener('click', onClickListaCasos);
+    els.clnEtapaCaso.addEventListener('change', onCambiarEtapaCaso);
+    els.clnTipoEvento.addEventListener('change', onChangeTipoEventoCaso);
+    els.btnAgregarEvento.addEventListener('click', onClickAgregarEvento);
+    els.clnTimeline.addEventListener('click', onClickTimeline);
+    TC.ui.llenarSelectEtapas(els.clnTipoEvento, TC.crm.tiposEvento(), 'cotizacion');
 
     actualizarBadgeCotizacion();
     recargarDatos();

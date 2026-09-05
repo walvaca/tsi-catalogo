@@ -128,6 +128,34 @@ table th{background:var(--card2);position:sticky;top:0}
 .hist-row:first-of-type{border-top:none}
 .hist-row-info b{display:block;font-size:14px}
 .hist-row-info span{font-size:12px;color:var(--muted)}
+
+/* CRM: clientes / casos / bitácora */
+.badge-producto{background:rgba(63,185,80,.18);color:var(--green)}
+.badge-servicio{background:rgba(232,145,47,.18);color:var(--accent)}
+.cln-cliente-row,.cln-caso-row{cursor:pointer}
+.cln-cliente-row:hover,.cln-caso-row:hover{background:var(--card2)}
+.cln-volver{background:transparent;color:var(--muted);font-size:13px;margin-bottom:12px;display:inline-block}
+.cln-tipo-botones{display:flex;gap:8px;margin:14px 0}
+.cln-tipo-botones .btn{flex:1}
+.cln-caso-totales{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:10px 0 16px;padding:10px;background:var(--bg2);border-radius:8px}
+.cln-caso-totales b{color:var(--text);display:block;font-size:14px}
+.sugerencia-cliente{padding:8px 10px;border-top:1px solid var(--border);cursor:pointer;font-size:13px}
+.sugerencia-cliente:first-of-type{border-top:none}
+.sugerencia-cliente:hover{background:var(--card2)}
+.sugerencia-cliente span{display:block;color:var(--muted);font-size:11.5px}
+#cotClienteSugerencias{border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto}
+.cliente-vinculado-info{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:8px;padding:8px 10px;background:var(--bg2);border-radius:8px}
+.cliente-vinculado-info a{cursor:pointer;margin-left:auto;font-size:12px}
+.evento-caso{padding:10px 0;border-top:1px solid var(--border)}
+.evento-caso:first-of-type{border-top:none}
+.evento-caso-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.evento-caso-top span{font-size:12px;color:var(--muted)}
+.evento-monto{font-weight:700}
+.evento-eliminar{background:transparent;color:var(--red);border:none;font-size:14px;margin-left:auto;padding:2px 6px}
+.evento-desc{font-size:13px;margin-top:4px;line-height:1.4}
+.evento-archivos{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.evento-foto{width:64px;height:64px;object-fit:cover;border-radius:8px}
+.evento-archivo{font-size:12px;background:var(--bg2);padding:6px 9px;border-radius:8px}
 </style>
 </head>
 <body>
@@ -137,6 +165,7 @@ table th{background:var(--card2);position:sticky;top:0}
     <div class="logo">🏷️</div>
     <h2>TSI Catálogo<span>Consulta rápida de precios · GVS · Tecnomax</span></h2>
     <button id="btnCotizacion" class="icon-btn icon-btn-badge" title="Cotización">🧾<span id="badgeCotizacion" class="badge-count hidden">0</span></button>
+    <button id="btnClientes" class="icon-btn" title="Clientes">📇</button>
     <button id="btnImportar" class="icon-btn" title="Importar catálogo">⇪</button>
   </header>
 
@@ -252,6 +281,14 @@ table th{background:var(--card2);position:sticky;top:0}
       <a id="lnkHistorial">🕘 Cotizaciones anteriores</a>
     </div>
 
+    <label class="field-label">Cliente (CRM, opcional)</label>
+    <input id="cotClienteBuscar" type="text" placeholder="Buscar cliente existente por nombre, teléfono o NIT...">
+    <div id="cotClienteSugerencias" class="hidden"></div>
+    <div id="cotClienteVinculadoInfo" class="cliente-vinculado-info hidden">
+      Vinculado a: <b id="cotClienteVinculadoNombre"></b>
+      <a id="cotClienteQuitarVinculo">Quitar</a>
+    </div>
+
     <label class="field-label">Cliente *</label>
     <input id="cotClienteNombre" type="text" placeholder="Nombre del cliente">
     <div class="mapeo-inline" style="margin-top:8px">
@@ -328,6 +365,103 @@ table th{background:var(--card2);position:sticky;top:0}
   </div>
 </div>
 
+<!-- Modal: Clientes (CRM) — multi-panel, mismo patrón que el asistente de importación -->
+<div id="modalClientes" class="modal hidden">
+  <div class="modal-card" style="max-width:640px">
+    <h3>Clientes <button id="btnCerrarClientes" class="icon-btn">✕</button></h3>
+
+    <div id="clnListado">
+      <input id="clnBuscarCliente" type="text" placeholder="Buscar por nombre, teléfono o NIT...">
+      <div class="modal-actions" style="justify-content:flex-start;margin-top:10px">
+        <button id="btnNuevoCliente" class="btn btn-sm">＋ Nuevo cliente</button>
+      </div>
+      <div id="clnListaClientes" style="margin-top:10px"></div>
+    </div>
+
+    <div id="clnNuevoCliente" class="hidden">
+      <a id="clnVolverForm" class="cln-volver" data-volver="clnListado">← Volver</a>
+      <label class="field-label">Nombre *</label>
+      <input id="clnNombre" type="text">
+      <div class="mapeo-inline" style="margin-top:8px">
+        <div><label class="field-label">Empresa</label><input id="clnEmpresa" type="text"></div>
+        <div><label class="field-label">NIT / Cédula</label><input id="clnNit" type="text"></div>
+      </div>
+      <div class="mapeo-inline">
+        <div><label class="field-label">Teléfono</label><input id="clnTelefono" type="text"></div>
+        <div><label class="field-label">Email</label><input id="clnEmail" type="email"></div>
+      </div>
+      <label class="field-label">Dirección</label>
+      <input id="clnDireccion" type="text">
+      <label class="field-label">Ciudad</label>
+      <input id="clnCiudad" type="text">
+      <label class="field-label">Notas</label>
+      <textarea id="clnNotas" rows="2"></textarea>
+      <div class="modal-actions">
+        <button id="btnGuardarCliente" class="btn">Guardar</button>
+      </div>
+    </div>
+
+    <div id="clnDetalleCliente" class="hidden">
+      <a class="cln-volver" data-volver="clnListado">← Volver a clientes</a>
+      <h4 id="clnDetalleNombre" style="font-size:17px;margin-bottom:4px"></h4>
+      <div id="clnDetalleMeta" style="color:var(--muted);font-size:13px;margin-bottom:6px"></div>
+      <button id="btnEditarCliente" class="btn btn-sec btn-sm">Editar datos</button>
+
+      <div class="cln-tipo-botones">
+        <button id="btnNuevoCasoProducto" class="btn btn-sec btn-sm">＋ Caso de producto</button>
+        <button id="btnNuevoCasoServicio" class="btn btn-sec btn-sm">＋ Caso de servicio</button>
+      </div>
+      <div id="clnNuevoCasoForm" class="hidden" style="margin-bottom:14px">
+        <label class="field-label">Título del caso</label>
+        <input id="clnTituloCaso" type="text" placeholder="Ej: Cámaras oficina principal">
+        <div class="modal-actions">
+          <button id="btnCancelarCaso" class="btn btn-sec btn-sm">Cancelar</button>
+          <button id="btnGuardarCaso" class="btn btn-sm">Crear caso</button>
+        </div>
+      </div>
+
+      <label class="field-label">Casos</label>
+      <div id="clnListaCasos"></div>
+    </div>
+
+    <div id="clnDetalleCaso" class="hidden">
+      <a class="cln-volver" data-volver="clnDetalleCliente">← Volver al cliente</a>
+      <h4 id="clnCasoTitulo" style="font-size:17px;margin-bottom:4px"></h4>
+      <div id="clnCasoMeta" style="color:var(--muted);font-size:13px;margin-bottom:8px"></div>
+      <label class="field-label">Etapa</label>
+      <select id="clnEtapaCaso"></select>
+
+      <div class="cln-caso-totales">
+        <div>Cotizado<b id="clnTotalCotizado">$0</b></div>
+        <div>Cobrado<b id="clnTotalCobrado">$0</b></div>
+        <div>Costos<b id="clnTotalCostos">$0</b></div>
+        <div id="clnGarantiaWrap">Garantía hasta<b id="clnGarantiaHasta">—</b></div>
+      </div>
+
+      <label class="field-label">Bitácora</label>
+      <div id="clnTimeline"></div>
+
+      <label class="field-label" style="margin-top:18px">Agregar evento</label>
+      <select id="clnTipoEvento"></select>
+      <div class="mapeo-inline" style="margin-top:8px">
+        <div><label class="field-label">Fecha</label><input id="clnFechaEvento" type="date"></div>
+        <div id="clnMontoWrap" class="hidden"><label class="field-label">Monto</label><input id="clnMontoEvento" type="number" min="0" step="1"></div>
+      </div>
+      <div id="clnCotizacionWrap" class="hidden">
+        <label class="field-label">Vincular cotización existente (opcional)</label>
+        <select id="clnCotizacionEvento"></select>
+      </div>
+      <label class="field-label">Descripción</label>
+      <textarea id="clnDescripcionEvento" rows="2"></textarea>
+      <label class="field-label">Archivos (fotos, PDF)</label>
+      <input id="clnArchivosEvento" type="file" accept="image/*,.pdf" multiple>
+      <div class="modal-actions">
+        <button id="btnAgregarEvento" class="btn">Agregar evento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
@@ -337,6 +471,7 @@ table th{background:var(--card2);position:sticky;top:0}
 <script src="js/parser-gvs.js"></script>
 <script src="js/parser-generic.js"></script>
 <script src="js/search.js"></script>
+<script src="js/crm.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/import-wizard.js"></script>
 <script src="js/cotizador.js"></script>

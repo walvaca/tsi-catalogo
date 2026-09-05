@@ -147,8 +147,89 @@ TC.ui = (function () {
       </div>`).join('');
   }
 
+  function llenarSelectEtapas(select, etapas, etapaActualId) {
+    select.innerHTML = etapas.map(e => `<option value="${escapeHtml(e.id)}">${escapeHtml(e.label)}</option>`).join('');
+    select.value = etapaActualId;
+  }
+
+  function tarjetaCliente(c) {
+    return `
+    <div class="entry cln-cliente-row" data-id="${escapeHtml(c.id)}">
+      <div class="desc">${escapeHtml(c.nombre || '(sin nombre)')}</div>
+      <div class="meta">${escapeHtml(c.empresa || '—')} · ${escapeHtml(c.telefono || 'sin teléfono')}</div>
+    </div>`;
+  }
+
+  function renderClientes(container, clientes) {
+    if (!clientes.length) {
+      container.innerHTML = '<div class="sin-resultados">Todavía no tienes clientes guardados.</div>';
+      return;
+    }
+    container.innerHTML = clientes.map(tarjetaCliente).join('');
+  }
+
+  function renderSugerenciasCliente(container, clientes) {
+    container.innerHTML = clientes.slice(0, 8).map(c => `
+      <div class="sugerencia-cliente" data-id="${escapeHtml(c.id)}">
+        <b>${escapeHtml(c.nombre || '(sin nombre)')}</b>
+        <span>${escapeHtml(c.empresa || '')} ${c.telefono ? '· ' + escapeHtml(c.telefono) : ''}</span>
+      </div>`).join('');
+  }
+
+  function tarjetaCaso(caso) {
+    const claseBadge = caso.tipo === 'servicio' ? 'badge-servicio' : 'badge-producto';
+    const etiquetaTipo = caso.tipo === 'servicio' ? 'Servicio técnico' : 'Venta de producto';
+    return `
+    <div class="entry cln-caso-row" data-id="${escapeHtml(caso.id)}">
+      <div class="entry-top">
+        <span class="badge ${claseBadge}">${etiquetaTipo}</span>
+        <span class="codigo">${escapeHtml(TC.crm.etiquetaEtapa(caso.tipo, caso.etapaActual))}</span>
+      </div>
+      <div class="desc">${escapeHtml(caso.titulo || '(sin título)')}</div>
+      <div class="meta">Creado ${new Date(caso.fechaCreacion).toLocaleDateString('es-CO')}</div>
+    </div>`;
+  }
+
+  function renderCasos(container, casos) {
+    if (!casos.length) {
+      container.innerHTML = '<div class="sin-resultados">Este cliente todavía no tiene casos.</div>';
+      return;
+    }
+    container.innerHTML = casos.map(tarjetaCaso).join('');
+  }
+
+  function tarjetaEvento(evento) {
+    const archivosHtml = (evento.archivos || []).map(a => a._url
+      ? (a.tipo && a.tipo.startsWith('image/')
+          ? `<img src="${escapeHtml(a._url)}" alt="${escapeHtml(a.nombre)}" class="evento-foto">`
+          : `<a href="${escapeHtml(a._url)}" target="_blank" rel="noopener" class="evento-archivo">📄 ${escapeHtml(a.nombre)}</a>`)
+      : '').join('');
+    const montoHtml = evento.monto != null
+      ? `<span class="evento-monto">${evento.tipo === 'costo' ? '-' : '+'}${moneda(evento.monto)}</span>` : '';
+    return `
+    <div class="evento-caso" data-id="${escapeHtml(evento.id)}">
+      <div class="evento-caso-top">
+        <b>${escapeHtml(TC.crm.etiquetaTipoEvento(evento.tipo))}</b>
+        <span>${new Date(evento.fecha).toLocaleDateString('es-CO')}</span>
+        ${montoHtml}
+        <button class="evento-eliminar" title="Eliminar">✕</button>
+      </div>
+      ${evento.descripcion ? `<div class="evento-desc">${escapeHtml(evento.descripcion)}</div>` : ''}
+      ${archivosHtml ? `<div class="evento-archivos">${archivosHtml}</div>` : ''}
+    </div>`;
+  }
+
+  function renderTimeline(container, eventos) {
+    if (!eventos.length) {
+      container.innerHTML = '<div class="sin-resultados">Todavía no hay eventos en este caso.</div>';
+      return;
+    }
+    container.innerHTML = eventos.map(tarjetaEvento).join('');
+  }
+
   return {
     escapeHtml, moneda, renderResultados, renderAlternativas, renderStats, llenarSelect,
-    tarjetaProducto, renderCotizacionItems, renderHistorial
+    tarjetaProducto, renderCotizacionItems, renderHistorial,
+    llenarSelectEtapas, renderClientes, renderSugerenciasCliente, renderCasos, renderTimeline
   };
 })();

@@ -5,7 +5,7 @@ var TC = window.TC || (window.TC = {});
 
 TC.db = (function () {
   const DB_NAME = 'tsiCatalogoDB';
-  const DB_VERSION = 3;
+  const DB_VERSION = 4;
   let dbPromise = null;
 
   function open() {
@@ -38,6 +38,18 @@ TC.db = (function () {
         }
         if (!db.objectStoreNames.contains('configuracion')) {
           db.createObjectStore('configuracion', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('clientes')) {
+          db.createObjectStore('clientes', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('casos')) {
+          const store = db.createObjectStore('casos', { keyPath: 'id' });
+          store.createIndex('clienteId', 'clienteId', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('eventosCaso')) {
+          const store = db.createObjectStore('eventosCaso', { keyPath: 'id' });
+          store.createIndex('casoId', 'casoId', { unique: false });
+          store.createIndex('fecha', 'fecha', { unique: false });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -181,10 +193,70 @@ TC.db = (function () {
     return rows.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
   }
 
+  async function getCotizacion(id) {
+    const t = await tx('cotizaciones', 'readonly');
+    return reqToPromise(t.objectStore('cotizaciones').get(id));
+  }
+
+  // ===== CRM: clientes, casos y bitácora de eventos =====
+
+  async function getAllClientes() {
+    const t = await tx('clientes', 'readonly');
+    return reqToPromise(t.objectStore('clientes').getAll());
+  }
+
+  async function getCliente(id) {
+    const t = await tx('clientes', 'readonly');
+    return reqToPromise(t.objectStore('clientes').get(id));
+  }
+
+  async function putCliente(cliente) {
+    const t = await tx('clientes', 'readwrite');
+    t.objectStore('clientes').put(cliente);
+    return txDone(t);
+  }
+
+  async function getCasosPorCliente(clienteId) {
+    const t = await tx('casos', 'readonly');
+    return reqToPromise(t.objectStore('casos').index('clienteId').getAll(clienteId));
+  }
+
+  async function getCaso(id) {
+    const t = await tx('casos', 'readonly');
+    return reqToPromise(t.objectStore('casos').get(id));
+  }
+
+  async function putCaso(caso) {
+    const t = await tx('casos', 'readwrite');
+    t.objectStore('casos').put(caso);
+    return txDone(t);
+  }
+
+  async function getEventosPorCaso(casoId) {
+    const t = await tx('eventosCaso', 'readonly');
+    const rows = await reqToPromise(t.objectStore('eventosCaso').index('casoId').getAll(casoId));
+    return rows.sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+  }
+
+  async function putEvento(evento) {
+    const t = await tx('eventosCaso', 'readwrite');
+    t.objectStore('eventosCaso').put(evento);
+    return txDone(t);
+  }
+
+  async function deleteEvento(id) {
+    const t = await tx('eventosCaso', 'readwrite');
+    t.objectStore('eventosCaso').delete(id);
+    return txDone(t);
+  }
+
   return {
     open, replaceProductos, getAllProductos, getAllOverrides,
     putOverride, deleteOverride, putImportacion, getImportaciones,
     getPerfil, putPerfil, replaceImagenes, getAllImagenes,
-    getConfigNegocio, putConfigNegocio, putCotizacion, getCotizaciones
+    getConfigNegocio, putConfigNegocio, putCotizacion, getCotizaciones, getCotizacion,
+    getAllClientes, getCliente, putCliente,
+    getCasosPorCliente, getCaso, putCaso,
+    getEventosPorCaso, putEvento, deleteEvento
   };
 })();

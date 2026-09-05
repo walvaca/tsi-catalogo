@@ -21,7 +21,7 @@ TC.cotizador = (function () {
 
   function vacio() {
     return {
-      cliente: { nombre: '', telefono: '', empresa: '', nit: '', direccion: '', ciudadEntrega: 'local' },
+      cliente: { nombre: '', telefono: '', empresa: '', nit: '', direccion: '', ciudadEntrega: 'local', crmClienteId: null },
       items: []
     };
   }

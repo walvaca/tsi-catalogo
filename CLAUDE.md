@@ -5,7 +5,9 @@ Herramienta interna de consulta rápida de precios para vender como distribuidor
 autorizado de tecnología para seguridad electrónica (GVS y Tecnomax como mayoristas).
 Cuando un cliente pregunta por un producto, permite buscarlo al instante, darle precio
 y alternativas, armarle una **cotización con utilidad aplicada** y mandarle un **PDF**
-por WhatsApp. Es un proyecto hermano de `tsi-vault` pero de dominio totalmente distinto
+por WhatsApp. También lleva un **CRM básico**: historial por cliente separado en venta
+de productos y servicio técnico, con etapas y una bitácora de documentos adjuntos por
+caso (ver "CRM" más abajo). Es un proyecto hermano de `tsi-vault` pero de dominio totalmente distinto
 (catálogo de productos, no contraseñas) — no comparten código. Publicado en
 `https://walvaca.github.io/tsi-catalogo/` (GitHub Pages, repo `walvaca/tsi-catalogo`).
 
@@ -210,6 +212,68 @@ precio seguido, a diferencia de los 30 días que maneja el portafolio de servici
 un pie de página centrado que repite en cada página con el portafolio de servicios de
 TSI (CCTV+IA, control de acceso, alarmas, redes, soporte) a modo de publicidad — todo
 tomado del material de marca real de TSI (`logo-tsi.png`, colores navy `#0d1421`).
+
+## CRM: clientes, casos y bitácora de eventos (`js/crm.js`)
+La app dejó de terminar en "generar el PDF" — ahora puede llevar un historial por
+cliente, separado en dos líneas de negocio (`casos.tipo`: `producto` / `servicio`),
+con etapas y una bitácora de documentos adjuntos por caso. **Fase 1** (esto ya está
+construido): clientes + casos + eventos. El tablero de control, la vista de garantías
+y el reporte de ingresos/costos son **Fase 2** — el modelo de datos ya los soporta sin
+migrar nada más (ver el final de esta sección). Google Drive (Fase 3) tampoco está
+construido todavía.
+
+**`eventosCaso` es un store aparte, no un array embebido en `casos`** — mismo patrón
+que ya usa `imagenes` (aparte, indexado por la llave del padre) en vez de guardar fotos
+dentro del registro del producto: cada evento nuevo (con sus fotos) se escribe solo,
+sin releer y reescribir todo el histórico de blobs acumulados del caso. Los archivos
+adjuntos (`evento.archivos[].blob`) son `File`/`Blob` crudos guardados tal cual —
+mismo patrón que `logoBlob`/`pdfBlob` — nunca base64.
+
+**Etapa (`casos.etapaActual`) y eventos son dos cosas separadas a propósito.** Cambiar
+de etapa (`TC.crm.cambiarEtapa`) NO agrega un evento a la bitácora — la etapa es
+"dónde va el caso", los eventos son "qué se adjuntó o se hizo". Cada `tipo` de caso
+tiene su propia lista fija de etapas (`ETAPAS_PRODUCTO`/`ETAPAS_SERVICIO` en
+`crm.js`); se guarda el `id` de la etapa, nunca la etiqueta, así que renombrar una
+etapa después es un cambio de una línea, sin migración.
+
+Los tipos de evento incluyen `'pago'` y `'costo'`, ambos usando el mismo campo
+genérico `monto` (con signo implícito por el tipo, no un número negativo) — así el
+futuro reporte de Fase 2 solo tiene que sumar `monto` agrupado por tipo
+(`totalCobrado`/`totalCostos`, ya recalculados en cada caso por
+`recalcularRollups`), sin tocar el esquema otra vez. `garantiaMeses` por defecto es 12
+(coincide con el texto de garantía que ya usa `pdf-cotizacion.js`) y
+`garantiaVigenteHasta` se calcula solo al registrar un evento `'entrega'`.
+
+**Ojo con fechas de `<input type="date">`**: un string `"YYYY-MM-DD"` a secas se
+interpreta como medianoche **UTC**, y en Colombia (UTC-5) eso cae en el día anterior
+al mostrarlo en local — ya pasó una vez con `garantiaVigenteHasta` mostrando un día
+menos. La fecha del formulario de "Agregar evento" se ancla a mediodía local
+(`+ 'T12:00:00'`) antes de convertirla a ISO, justo para evitar ese corrimiento — no
+quitar ese `T12:00:00` aunque parezca innecesario.
+
+**Vínculo opcional con el cotizador** (`js/app.js`): el buscador de cliente dentro de
+`modalCotizacion` es aparte del flujo normal — si no se usa, cotizar sigue funcionando
+exactamente igual que antes de que existiera el CRM. El vínculo se guarda como
+`crmClienteId` dentro del mismo borrador de `localStorage` que ya existía (no hay
+estado nuevo que sincronizar). Al generar el PDF, si hay `crmClienteId`, se reutiliza
+el caso de tipo `producto` más reciente que no esté `cerrado` para ese cliente (o se
+crea uno) y se le agrega un evento `'cotizacion'` con el número/total — todo envuelto
+en `try/catch` porque una falla del CRM nunca debe romper la generación de la
+cotización, que es el flujo que factura de verdad.
+
+**Fase 2 (no construida todavía, el modelo ya la soporta):** tablero de control por
+fechas (`eventosCaso` ya tiene índice por `fecha`), alertas de garantía próxima a
+vencer (`casos.garantiaVigenteHasta` ya queda calculado), reporte de ingresos/costos
+(`totalCobrado`/`totalCostos` ya están en cada caso), formularios específicos por tipo
+de evento más allá de tipo+descripción+fotos (se podría agregar un `camposExtra`
+opcional sin migrar nada).
+
+**Fase 3 (no construida todavía):** sincronización con Google Drive, puerto del
+patrón que ya usa `tsi-vault` (Google Identity Services + `initTokenClient` con scope
+`drive.file`, sin tokens persistidos, script cargado bajo demanda — ver
+`tsi-vault/index.html` alrededor de la línea 1715-1865). Salvedad ya identificada: los
+`Blob` de fotos/PDF (acá y en `logoBlob`/`pdfBlob`) tendrán que subirse aparte, no
+como JSON — Drive no serializa blobs dentro de un documento.
 
 ## Seguridad / límites deliberados (no negociable)
 - **Nunca automatizar login ni scraping** de los portales de GVS/Tecnomax con las
