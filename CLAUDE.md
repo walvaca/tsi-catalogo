@@ -261,12 +261,28 @@ crea uno) y se le agrega un evento `'cotizacion'` con el número/total — todo 
 en `try/catch` porque una falla del CRM nunca debe romper la generación de la
 cotización, que es el flujo que factura de verdad.
 
-**Fase 2 (no construida todavía, el modelo ya la soporta):** tablero de control por
-fechas (`eventosCaso` ya tiene índice por `fecha`), alertas de garantía próxima a
-vencer (`casos.garantiaVigenteHasta` ya queda calculado), reporte de ingresos/costos
-(`totalCobrado`/`totalCostos` ya están en cada caso), formularios específicos por tipo
-de evento más allá de tipo+descripción+fotos (se podría agregar un `camposExtra`
-opcional sin migrar nada).
+## Tablero de control (Fase 2)
+Botón "📊 Tablero" en el header, un solo modal con tres secciones apiladas (no
+necesita el patrón multi-panel de `modalClientes` porque ninguna tiene
+sub-navegación propia): **ingresos y costos** del periodo, **actividad por
+fechas** (todos los eventos de todos los clientes, más recientes primero), y
+**garantías** (todos los casos con `garantiaVigenteHasta`, ordenados por
+vencimiento, con badge Vigente/Por vencer/Vencida — `TC.crm.estadoGarantia`,
+umbral de 30 días).
+
+Las tres vistas cruzan `clientes`/`casos`/`eventosCaso` **en memoria** con
+`getAll()` + `Map` (`TC.crm.actividadEnRango`, `garantiasVigentes`,
+`reporteFinanciero`) — mismo criterio de "un filtro lineal alcanza a esta
+escala" que ya usa `getCotizaciones`, nada de índices nuevos más allá del
+`fecha` que `eventosCaso` ya traía desde la Fase 1. El filtro de fecha compara
+los strings ISO directamente (`ev.fecha >= desde+'T00:00:00.000Z'`), sin volver
+a construir objetos `Date` — así se evita por completo el problema de zona
+horaria que ya salió una vez con `<input type="date">`.
+
+**Clic en cualquier fila (actividad o garantía) abre ese caso** reutilizando
+`abrirDetalleCliente`/`abrirDetalleCaso` de `js/app.js` tal cual — el tablero
+es una puerta de entrada al detalle que ya existía, no una vista paralela con
+su propia lógica.
 
 **Fase 3 (no construida todavía):** sincronización con Google Drive, puerto del
 patrón que ya usa `tsi-vault` (Google Identity Services + `initTokenClient` con scope

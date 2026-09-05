@@ -221,6 +221,16 @@ TC.db = (function () {
     return reqToPromise(t.objectStore('casos').index('clienteId').getAll(clienteId));
   }
 
+  async function getAllCasos() {
+    const t = await tx('casos', 'readonly');
+    return reqToPromise(t.objectStore('casos').getAll());
+  }
+
+  async function getAllEventos() {
+    const t = await tx('eventosCaso', 'readonly');
+    return reqToPromise(t.objectStore('eventosCaso').getAll());
+  }
+
   async function getCaso(id) {
     const t = await tx('casos', 'readonly');
     return reqToPromise(t.objectStore('casos').get(id));
@@ -256,7 +266,7 @@ TC.db = (function () {
     getPerfil, putPerfil, replaceImagenes, getAllImagenes,
     getConfigNegocio, putConfigNegocio, putCotizacion, getCotizaciones, getCotizacion,
     getAllClientes, getCliente, putCliente,
-    getCasosPorCliente, getCaso, putCaso,
-    getEventosPorCaso, putEvento, deleteEvento
+    getCasosPorCliente, getCaso, putCaso, getAllCasos,
+    getEventosPorCaso, putEvento, deleteEvento, getAllEventos
   };
 })();

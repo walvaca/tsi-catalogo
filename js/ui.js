@@ -227,9 +227,63 @@ TC.ui = (function () {
     container.innerHTML = eventos.map(tarjetaEvento).join('');
   }
 
+  function filaActividad(ev) {
+    const montoHtml = ev.monto != null
+      ? `<span class="evento-monto">${ev.tipo === 'costo' ? '-' : '+'}${moneda(ev.monto)}</span>` : '';
+    return `
+    <div class="evento-caso fila-clickeable" data-caso-id="${escapeHtml(ev.casoId)}" data-cliente-id="${escapeHtml(ev.clienteId || '')}">
+      <div class="evento-caso-top">
+        <b>${escapeHtml(TC.crm.etiquetaTipoEvento(ev.tipo))}</b>
+        <span>${new Date(ev.fecha).toLocaleDateString('es-CO')}</span>
+        ${montoHtml}
+      </div>
+      <div class="evento-desc">${escapeHtml(ev.clienteNombre || '(cliente eliminado)')} · ${escapeHtml(ev.casoTitulo || '')}</div>
+      ${ev.descripcion ? `<div class="evento-desc">${escapeHtml(ev.descripcion)}</div>` : ''}
+    </div>`;
+  }
+
+  function renderActividad(container, eventos) {
+    if (!eventos.length) {
+      container.innerHTML = '<div class="sin-resultados">No hay actividad en este rango de fechas.</div>';
+      return;
+    }
+    container.innerHTML = eventos.map(filaActividad).join('');
+  }
+
+  function filaGarantia(caso) {
+    const claseBadge = 'badge-garantia-' + (caso.estado === 'por_vencer' ? 'por-vencer' : caso.estado);
+    const etiqueta = caso.estado === 'vencida' ? 'Vencida' : caso.estado === 'por_vencer' ? 'Por vencer' : 'Vigente';
+    return `
+    <div class="evento-caso fila-clickeable" data-caso-id="${escapeHtml(caso.id)}" data-cliente-id="${escapeHtml(caso.clienteId)}">
+      <div class="evento-caso-top">
+        <b>${escapeHtml(caso.clienteNombre || '(cliente eliminado)')} · ${escapeHtml(caso.titulo || '')}</b>
+        <span class="badge ${claseBadge}">${etiqueta}</span>
+      </div>
+      <div class="evento-desc">Hasta ${new Date(caso.garantiaVigenteHasta).toLocaleDateString('es-CO')}</div>
+    </div>`;
+  }
+
+  function renderGarantias(container, casos) {
+    if (!casos.length) {
+      container.innerHTML = '<div class="sin-resultados">Todavía no hay casos con garantía registrada.</div>';
+      return;
+    }
+    container.innerHTML = casos.map(filaGarantia).join('');
+  }
+
+  function renderResumenFinanciero(container, resumen) {
+    container.innerHTML = `
+      <div>Ingresos<b>${moneda(resumen.ingresos)}</b></div>
+      <div>Costos<b>${moneda(resumen.costos)}</b></div>
+      <div>Utilidad<b>${moneda(resumen.utilidad)}</b></div>
+      <div>Producto (ing./cost.)<b>${moneda(resumen.porTipo.producto.ingresos)} / ${moneda(resumen.porTipo.producto.costos)}</b></div>
+      <div>Servicio (ing./cost.)<b>${moneda(resumen.porTipo.servicio.ingresos)} / ${moneda(resumen.porTipo.servicio.costos)}</b></div>`;
+  }
+
   return {
     escapeHtml, moneda, renderResultados, renderAlternativas, renderStats, llenarSelect,
     tarjetaProducto, renderCotizacionItems, renderHistorial,
-    llenarSelectEtapas, renderClientes, renderSugerenciasCliente, renderCasos, renderTimeline
+    llenarSelectEtapas, renderClientes, renderSugerenciasCliente, renderCasos, renderTimeline,
+    renderActividad, renderGarantias, renderResumenFinanciero
   };
 })();

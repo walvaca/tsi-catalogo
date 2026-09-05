@@ -574,6 +574,54 @@ var TC = window.TC || (window.TC = {});
     await abrirDetalleCaso(casoActualCRM.id);
   }
 
+  // ===== Tablero de control =====
+
+  function fechaISOaInput(fecha) {
+    return fecha.toISOString().slice(0, 10);
+  }
+
+  function abrirTablero() {
+    if (!els.tabDesde.value) {
+      const hace30 = new Date();
+      hace30.setDate(hace30.getDate() - 30);
+      els.tabDesde.value = fechaISOaInput(hace30);
+    }
+    if (!els.tabHasta.value) els.tabHasta.value = fechaISOaInput(new Date());
+    actualizarTablero();
+    els.modalTablero.classList.remove('hidden');
+  }
+
+  function cerrarTablero() {
+    els.modalTablero.classList.add('hidden');
+  }
+
+  async function actualizarTablero() {
+    const desde = els.tabDesde.value ? els.tabDesde.value + 'T00:00:00.000Z' : null;
+    const hasta = els.tabHasta.value ? els.tabHasta.value + 'T23:59:59.999Z' : null;
+    const tipo = els.tabFiltroTipo.value || null;
+
+    const [actividad, resumen, garantias] = await Promise.all([
+      TC.crm.actividadEnRango(desde, hasta, tipo),
+      TC.crm.reporteFinanciero(desde, hasta),
+      TC.crm.garantiasVigentes()
+    ]);
+    TC.ui.renderResumenFinanciero(els.tabResumenFinanciero, resumen);
+    TC.ui.renderActividad(els.tabActividad, actividad);
+    TC.ui.renderGarantias(els.tabGarantias, garantias);
+  }
+
+  async function onClickFilaTablero(e) {
+    const fila = e.target.closest('.fila-clickeable');
+    if (!fila) return;
+    const casoId = fila.dataset.casoId;
+    const clienteId = fila.dataset.clienteId;
+    if (!casoId || !clienteId) return;
+    cerrarTablero();
+    await abrirDetalleCliente(clienteId);
+    await abrirDetalleCaso(casoId);
+    els.modalClientes.classList.remove('hidden');
+  }
+
   function abrirModalEditar(id) {
     const producto = buscarProductoPorId(id);
     if (!producto) return;
@@ -731,7 +779,17 @@ var TC = window.TC || (window.TC = {});
       clnCotizacionEvento: $('clnCotizacionEvento'),
       clnDescripcionEvento: $('clnDescripcionEvento'),
       clnArchivosEvento: $('clnArchivosEvento'),
-      btnAgregarEvento: $('btnAgregarEvento')
+      btnAgregarEvento: $('btnAgregarEvento'),
+
+      btnTablero: $('btnTablero'),
+      modalTablero: $('modalTablero'),
+      btnCerrarTablero: $('btnCerrarTablero'),
+      tabDesde: $('tabDesde'),
+      tabHasta: $('tabHasta'),
+      tabFiltroTipo: $('tabFiltroTipo'),
+      tabResumenFinanciero: $('tabResumenFinanciero'),
+      tabActividad: $('tabActividad'),
+      tabGarantias: $('tabGarantias')
     };
 
     TC.importWizard.init(recargarDatos);
@@ -823,6 +881,15 @@ var TC = window.TC || (window.TC = {});
     els.btnAgregarEvento.addEventListener('click', onClickAgregarEvento);
     els.clnTimeline.addEventListener('click', onClickTimeline);
     TC.ui.llenarSelectEtapas(els.clnTipoEvento, TC.crm.tiposEvento(), 'cotizacion');
+
+    els.btnTablero.addEventListener('click', abrirTablero);
+    els.btnCerrarTablero.addEventListener('click', cerrarTablero);
+    els.modalTablero.addEventListener('click', e => { if (e.target === els.modalTablero) cerrarTablero(); });
+    els.tabDesde.addEventListener('change', actualizarTablero);
+    els.tabHasta.addEventListener('change', actualizarTablero);
+    els.tabFiltroTipo.addEventListener('change', actualizarTablero);
+    els.tabActividad.addEventListener('click', onClickFilaTablero);
+    els.tabGarantias.addEventListener('click', onClickFilaTablero);
 
     actualizarBadgeCotizacion();
     recargarDatos();

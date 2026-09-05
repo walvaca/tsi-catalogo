@@ -156,6 +156,13 @@ table th{background:var(--card2);position:sticky;top:0}
 .evento-archivos{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .evento-foto{width:64px;height:64px;object-fit:cover;border-radius:8px}
 .evento-archivo{font-size:12px;background:var(--bg2);padding:6px 9px;border-radius:8px}
+
+/* Tablero */
+.badge-garantia-vigente{background:rgba(63,185,80,.18);color:var(--green)}
+.badge-garantia-por-vencer{background:rgba(210,153,34,.18);color:var(--yellow)}
+.badge-garantia-vencida{background:rgba(248,81,73,.18);color:var(--red)}
+.fila-clickeable{cursor:pointer}
+.fila-clickeable:hover{background:var(--card2)}
 </style>
 </head>
 <body>
@@ -166,6 +173,7 @@ table th{background:var(--card2);position:sticky;top:0}
     <h2>TSI Catálogo<span>Consulta rápida de precios · GVS · Tecnomax</span></h2>
     <button id="btnCotizacion" class="icon-btn icon-btn-badge" title="Cotización">🧾<span id="badgeCotizacion" class="badge-count hidden">0</span></button>
     <button id="btnClientes" class="icon-btn" title="Clientes">📇</button>
+    <button id="btnTablero" class="icon-btn" title="Tablero">📊</button>
     <button id="btnImportar" class="icon-btn" title="Importar catálogo">⇪</button>
   </header>
 
@@ -459,6 +467,33 @@ table th{background:var(--card2);position:sticky;top:0}
         <button id="btnAgregarEvento" class="btn">Agregar evento</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Modal: Tablero de control (actividad, garantías, ingresos/costos) -->
+<div id="modalTablero" class="modal hidden">
+  <div class="modal-card" style="max-width:700px">
+    <h3>Tablero <button id="btnCerrarTablero" class="icon-btn">✕</button></h3>
+
+    <div class="mapeo-inline">
+      <div><label class="field-label">Desde</label><input id="tabDesde" type="date"></div>
+      <div><label class="field-label">Hasta</label><input id="tabHasta" type="date"></div>
+    </div>
+    <label class="field-label">Tipo</label>
+    <select id="tabFiltroTipo">
+      <option value="">Todos los tipos</option>
+      <option value="producto">Venta de producto</option>
+      <option value="servicio">Servicio técnico</option>
+    </select>
+
+    <label class="field-label" style="margin-top:18px">Ingresos y costos en el periodo</label>
+    <div class="cln-caso-totales" id="tabResumenFinanciero"></div>
+
+    <label class="field-label" style="margin-top:18px">Actividad por fechas</label>
+    <div id="tabActividad"></div>
+
+    <label class="field-label" style="margin-top:18px">Garantías</label>
+    <div id="tabGarantias"></div>
   </div>
 </div>
 

@@ -213,11 +213,77 @@ TC.crm = (function () {
     return TC.db.getEventosPorCaso(casoId);
   }
 
+  // ===== Tablero: actividad, garantías y reporte financiero =====
+  // Todo se cruza en memoria (getAll + Map), igual que getCotizaciones ya hace
+  // — a esta escala (docenas de clientes, cientos de casos/eventos) no hace
+  // falta ninguna consulta indexada más fina.
+
+  function estadoGarantia(fechaHasta) {
+    if (!fechaHasta) return null;
+    const dias = (new Date(fechaHasta) - new Date()) / 86400000;
+    if (dias < 0) return 'vencida';
+    if (dias <= 30) return 'por_vencer';
+    return 'vigente';
+  }
+
+  async function actividadEnRango(desde, hasta, tipo) {
+    const [casos, eventos, clientes] = await Promise.all(
+      [TC.db.getAllCasos(), TC.db.getAllEventos(), TC.db.getAllClientes()]);
+    const casosPorId = new Map(casos.map(c => [c.id, c]));
+    const clientesPorId = new Map(clientes.map(c => [c.id, c]));
+    return eventos
+      .filter(ev => (!desde || ev.fecha >= desde) && (!hasta || ev.fecha <= hasta))
+      .filter(ev => !tipo || (casosPorId.get(ev.casoId) || {}).tipo === tipo)
+      .map(ev => {
+        const caso = casosPorId.get(ev.casoId) || {};
+        const cliente = clientesPorId.get(caso.clienteId) || {};
+        return Object.assign({}, ev, {
+          casoId: ev.casoId, casoTitulo: caso.titulo, casoTipo: caso.tipo,
+          clienteId: caso.clienteId, clienteNombre: cliente.nombre
+        });
+      })
+      .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  }
+
+  async function garantiasVigentes() {
+    const [casos, clientes] = await Promise.all([TC.db.getAllCasos(), TC.db.getAllClientes()]);
+    const clientesPorId = new Map(clientes.map(c => [c.id, c]));
+    return casos
+      .filter(c => c.garantiaVigenteHasta)
+      .map(c => Object.assign({}, c, {
+        clienteNombre: (clientesPorId.get(c.clienteId) || {}).nombre,
+        estado: estadoGarantia(c.garantiaVigenteHasta)
+      }))
+      .sort((a, b) => (a.garantiaVigenteHasta < b.garantiaVigenteHasta ? -1 : 1));
+  }
+
+  async function reporteFinanciero(desde, hasta) {
+    const [eventos, casos] = await Promise.all([TC.db.getAllEventos(), TC.db.getAllCasos()]);
+    const casosPorId = new Map(casos.map(c => [c.id, c]));
+    const resumen = {
+      ingresos: 0, costos: 0,
+      porTipo: { producto: { ingresos: 0, costos: 0 }, servicio: { ingresos: 0, costos: 0 } }
+    };
+    for (const ev of eventos) {
+      if (ev.tipo !== 'pago' && ev.tipo !== 'costo') continue;
+      if (desde && ev.fecha < desde) continue;
+      if (hasta && ev.fecha > hasta) continue;
+      const tipoCaso = (casosPorId.get(ev.casoId) || {}).tipo === 'servicio' ? 'servicio' : 'producto';
+      const monto = ev.monto || 0;
+      const campo = ev.tipo === 'pago' ? 'ingresos' : 'costos';
+      resumen[campo] += monto;
+      resumen.porTipo[tipoCaso][campo] += monto;
+    }
+    resumen.utilidad = resumen.ingresos - resumen.costos;
+    return resumen;
+  }
+
   return {
     etapasPara, etiquetaEtapa, tiposEvento, etiquetaTipoEvento,
     crearCliente, actualizarCliente, listarClientes, obtenerCliente, filtrarClientes,
     crearCaso, listarCasosPorCliente, obtenerCaso, cambiarEtapa,
     agregarEvento, eliminarEvento, listarEventosPorCaso,
-    calcularGarantiaVigenteHasta
+    calcularGarantiaVigenteHasta,
+    estadoGarantia, actividadEnRango, garantiasVigentes, reporteFinanciero
   };
 })();
