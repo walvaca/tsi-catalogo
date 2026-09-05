@@ -33,6 +33,8 @@ var TC = window.TC || (window.TC = {});
     indice = TC.search.construirIndice(fusionado);
     actualizarFiltroProveedor();
     actualizarFiltroCategoria();
+    actualizarFiltroSubcategoria();
+    actualizarFiltroMarca();
     await actualizarStats();
     ejecutarBusqueda();
   }
@@ -54,10 +56,38 @@ var TC = window.TC || (window.TC = {});
     TC.ui.llenarSelect(els.filtroCategoria, categorias, 'Todas las categorías');
   }
 
+  function actualizarFiltroSubcategoria() {
+    const subcategorias = TC.search.subcategoriasDisponibles(
+      fusionado, els.filtroProveedor.value || null, els.filtroCategoria.value || null);
+    TC.ui.llenarSelect(els.filtroSubcategoria, subcategorias, 'Todas las subcategorías');
+  }
+
+  function actualizarFiltroMarca() {
+    const marcas = TC.search.marcasDisponibles(
+      fusionado, els.filtroProveedor.value || null, els.filtroCategoria.value || null);
+    TC.ui.llenarSelect(els.filtroMarca, marcas, 'Todas las marcas');
+  }
+
+  function limpiarFiltros() {
+    els.inputBuscar.value = '';
+    els.filtroProveedor.value = '';
+    els.filtroCategoria.value = '';
+    els.filtroSubcategoria.value = '';
+    els.filtroMarca.value = '';
+    els.filtroDisponibilidad.value = '';
+    actualizarFiltroCategoria();
+    actualizarFiltroSubcategoria();
+    actualizarFiltroMarca();
+    ejecutarBusqueda();
+  }
+
   function ejecutarBusqueda() {
     const resultados = TC.search.buscar(indice, els.inputBuscar.value, {
       proveedor: els.filtroProveedor.value || null,
-      categoria: els.filtroCategoria.value || null
+      categoria: els.filtroCategoria.value || null,
+      subcategoria: els.filtroSubcategoria.value || null,
+      marca: els.filtroMarca.value || null,
+      disponibilidad: els.filtroDisponibilidad.value || null
     });
     TC.ui.renderResultados(els.resultados, resultados);
   }
@@ -314,6 +344,10 @@ var TC = window.TC || (window.TC = {});
       inputBuscar: $('inputBuscar'),
       filtroProveedor: $('filtroProveedor'),
       filtroCategoria: $('filtroCategoria'),
+      filtroSubcategoria: $('filtroSubcategoria'),
+      filtroMarca: $('filtroMarca'),
+      filtroDisponibilidad: $('filtroDisponibilidad'),
+      btnLimpiarFiltros: $('btnLimpiarFiltros'),
       resultados: $('resultados'),
       btnImportar: $('btnImportar'),
       btnImportarVacio: $('btnImportarVacio'),
@@ -368,8 +402,16 @@ var TC = window.TC || (window.TC = {});
     TC.importWizard.init(recargarDatos);
 
     els.inputBuscar.addEventListener('input', debounce(ejecutarBusqueda, 120));
-    els.filtroProveedor.addEventListener('change', () => { actualizarFiltroCategoria(); ejecutarBusqueda(); });
-    els.filtroCategoria.addEventListener('change', ejecutarBusqueda);
+    els.filtroProveedor.addEventListener('change', () => {
+      actualizarFiltroCategoria(); actualizarFiltroSubcategoria(); actualizarFiltroMarca(); ejecutarBusqueda();
+    });
+    els.filtroCategoria.addEventListener('change', () => {
+      actualizarFiltroSubcategoria(); actualizarFiltroMarca(); ejecutarBusqueda();
+    });
+    els.filtroSubcategoria.addEventListener('change', ejecutarBusqueda);
+    els.filtroMarca.addEventListener('change', ejecutarBusqueda);
+    els.filtroDisponibilidad.addEventListener('change', ejecutarBusqueda);
+    els.btnLimpiarFiltros.addEventListener('click', limpiarFiltros);
     els.resultados.addEventListener('click', onClickResultados);
     els.btnImportar.addEventListener('click', () => TC.importWizard.abrir());
     els.btnImportarVacio.addEventListener('click', () => TC.importWizard.abrir());

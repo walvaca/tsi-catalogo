@@ -49,7 +49,9 @@ header h2 span{display:block;font-size:11px;color:var(--muted);font-weight:400}
 .empty-state p{color:var(--muted);font-size:13.5px;margin-bottom:18px;line-height:1.5}
 
 .search-row{margin-bottom:10px}
-.filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:14px}
+.filters .btn{grid-column:1/-1}
+@media (min-width:520px){.filters .btn{grid-column:auto}}
 
 .entry{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
 .entry-row{display:flex;gap:12px}
@@ -153,6 +155,15 @@ table th{background:var(--card2);position:sticky;top:0}
     <div class="filters">
       <select id="filtroProveedor"><option value="">Todos los proveedores</option></select>
       <select id="filtroCategoria"><option value="">Todas las categorías</option></select>
+      <select id="filtroSubcategoria"><option value="">Todas las subcategorías</option></select>
+      <select id="filtroMarca"><option value="">Todas las marcas</option></select>
+      <select id="filtroDisponibilidad">
+        <option value="">Disponibilidad: todas</option>
+        <option value="disponible">Disponibles</option>
+        <option value="agotado">Agotados</option>
+        <option value="consultar">Consultar precio</option>
+      </select>
+      <button id="btnLimpiarFiltros" class="btn btn-sec btn-sm">Limpiar filtros</button>
     </div>
     <div id="resultados"></div>
   </div>

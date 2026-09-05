@@ -149,6 +149,22 @@ continuación visual de otro ítem). El script imprime esas filas problemáticas
 consola — conviene revisarlas a mano si aparecen más al convertir un PDF futuro,
 sobre todo si Tecnomax cambia el diseño del documento.
 
+## Buscador y filtros (`js/search.js`)
+Además del texto libre, hay 5 filtros combinables: proveedor, categoría, subcategoría,
+marca y disponibilidad. Categoría/subcategoría/marca están en **cascada** (`js/app.js:
+actualizarFiltro*`) — cambiar proveedor o categoría repuebla las opciones de los
+selects que dependen de él; si el valor elegido ya no aplica, `TC.ui.llenarSelect` lo
+resetea solo (por eso "Limpiar filtros" pone primero los `<select>.value = ''`
+explícitamente antes de repoblar — si no, un valor que sigue siendo válido en la lista
+nueva no se limpia).
+
+**Disponibilidad no es un campo único** — se deriva de dos booleans que nunca deben
+tratarse como lo mismo (ver más abajo): "Disponibles" = `!agotado && precioConIVA !=
+null`, "Agotados" = `agotado`, "Consultar precio" = `!agotado && precioConIVA == null`
+(el caso de Tecnomax "CONSULTAR ASESOR"). GVS no tiene productos agotados ni sin
+precio en su catálogo — esos dos filtros solo aportan algo cuando hay datos de
+Tecnomax importados.
+
 ## Cotizador (`js/cotizador.js` + `js/pdf-cotizacion.js`)
 Desde cualquier tarjeta de producto, "🛒 Agregar a cotización" la agrega a un
 **borrador** (`localStorage`, clave `tsiCatalogoCotizacionDraft` — ver arriba por qué

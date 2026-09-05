@@ -44,6 +44,11 @@ TC.search = (function () {
     let resultados = indice;
     if (filtros.proveedor) resultados = resultados.filter(e => e.p.proveedor === filtros.proveedor);
     if (filtros.categoria) resultados = resultados.filter(e => e.p.categoria === filtros.categoria);
+    if (filtros.subcategoria) resultados = resultados.filter(e => e.p.subcategoria === filtros.subcategoria);
+    if (filtros.marca) resultados = resultados.filter(e => e.p.marca === filtros.marca);
+    if (filtros.disponibilidad === 'disponible') resultados = resultados.filter(e => !e.p.agotado && e.p.precioConIVA != null);
+    else if (filtros.disponibilidad === 'agotado') resultados = resultados.filter(e => e.p.agotado);
+    else if (filtros.disponibilidad === 'consultar') resultados = resultados.filter(e => !e.p.agotado && e.p.precioConIVA == null);
 
     if (terminos.length === 0) {
       return resultados.map(e => e.p).slice(0, 200);
@@ -85,5 +90,28 @@ TC.search = (function () {
     return Array.from(set).sort();
   }
 
-  return { normalizar, fusionar, construirIndice, buscar, alternativas, categoriasDisponibles };
+  function subcategoriasDisponibles(catalogoFusionado, proveedor, categoria) {
+    const set = new Set();
+    for (const p of catalogoFusionado) {
+      if (proveedor && p.proveedor !== proveedor) continue;
+      if (categoria && p.categoria !== categoria) continue;
+      if (p.subcategoria) set.add(p.subcategoria);
+    }
+    return Array.from(set).sort();
+  }
+
+  function marcasDisponibles(catalogoFusionado, proveedor, categoria) {
+    const set = new Set();
+    for (const p of catalogoFusionado) {
+      if (proveedor && p.proveedor !== proveedor) continue;
+      if (categoria && p.categoria !== categoria) continue;
+      if (p.marca) set.add(p.marca);
+    }
+    return Array.from(set).sort();
+  }
+
+  return {
+    normalizar, fusionar, construirIndice, buscar, alternativas,
+    categoriasDisponibles, subcategoriasDisponibles, marcasDisponibles
+  };
 })();
