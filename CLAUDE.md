@@ -308,3 +308,11 @@ como JSON — Drive no serializa blobs dentro de un documento.
 - Textos de interfaz en español.
 - CSS con variables en `:root` (mismo patrón que `tsi-vault`, con acento en naranja
   en vez de azul para diferenciar visualmente los dos proyectos).
+- **Identidad visual "tech futurista"** (pedido explícito del usuario, aplica a la
+  entrada de la app y se puede extender al resto): logo e íconos grandes con brillo
+  animado (`@keyframes glowPulse`, reutilizada en `.logo` y `.empty-icon`), textos de
+  título con degradado de color (`background-clip:text`), botones con degradado +
+  sombra de brillo en vez de color plano, fondo con resplandores radiales sutiles
+  (`--glow`/`--violet` en `:root`). El botón "✕" de cerrar modales sigue usando
+  `.icon-btn` base (chico, sin el tratamiento grande) — el estilo grande solo aplica a
+  `header .icon-btn` a propósito, no a todos los `.icon-btn` del documento.
